@@ -1,0 +1,35 @@
+AFMM is a Fast Multipole Method library for the Laplace equation in
+axisymmetric domains.
+
+Installation instructions are given in the file INSTALL. If you have
+downloaded the github distribution, you will need to set up the
+automake system by running
+
+./autogen.sh
+
+in the root directory of the source code. You can then go through the
+usual autotools configure process
+
+./configure (options)
+
+It is very strongly recommended to compile wbfmm with the highest
+level (-O3) of optimization. It makes a very big difference to the
+performance, even compared to using the -O2 flag. You can do this with
+
+CFLAGS="-O3 -g" ./configure ...
+
+(remove -g to switch off debugging support)
+
+To compile the code:
+
+make
+
+and to install it:
+
+make install
+
+If you want to generate the documentation:
+
+make doxygen-doc
+
+installs the html documentation in doc/html

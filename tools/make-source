@@ -1,0 +1,8 @@
+#!/bin/bash
+
+opfile=$1
+
+sed -e s/AFMM_REAL/gdouble/g -e s/_FLOAT//g -e s/FLOATFMT/lg/g \
+    -e s/FLOATEXP/1.16e/g \
+    -e s/FFTW_PLAN/fftw_plan/ \
+    ${opfile}.c.in > ${opfile}.c

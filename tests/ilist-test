@@ -1,0 +1,33 @@
+#!/bin/bash
+
+stub="ilist-test" ;
+di=(0 0 1 1 2 2 2 2 3 3 3 3) ;
+dj=(2 3 2 3 0 1 2 3 0 1 2 3) ;
+
+for i in 0 2
+	 ##{0..11}
+do
+    efile=${stub}-${di[i]}-${dj[i]}-error.dat
+    rm -f ${efile}
+    
+    echo ${di[i]} ${dj[i]}
+    sfile=${stub}-p${di[i]}-p${dj[i]}-source.dat
+    ffile=${stub}-p${di[i]}-p${dj[i]}-field.dat
+    ./field-check ${sfile} ${ffile} etmp
+    cat etmp >> ${efile}
+    
+    sfile=${stub}-p${di[i]}-m${dj[i]}-source.dat
+    ffile=${stub}-p${di[i]}-m${dj[i]}-field.dat
+    ./field-check ${sfile} ${ffile} etmp
+    cat etmp >> ${efile}
+
+    sfile=${stub}-m${di[i]}-p${dj[i]}-source.dat
+    ffile=${stub}-m${di[i]}-p${dj[i]}-field.dat
+    ./field-check ${sfile} ${ffile} etmp    
+    cat etmp >> ${efile}
+
+    sfile=${stub}-m${di[i]}-m${dj[i]}-source.dat
+    ffile=${stub}-m${di[i]}-m${dj[i]}-field.dat
+    ./field-check ${sfile} ${ffile} etmp
+    cat etmp >> ${efile}
+done

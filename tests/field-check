@@ -1,0 +1,26 @@
+#!/bin/bash
+
+sfile=$1
+ffile=$2
+efile=$3
+
+../tools/afmm-tree-calc -s ${sfile} -f ${ffile} -F 16 -S 16 > tree.dat
+../tools/afmm-direct-calc -s ${sfile} -f ${ffile} > direct.dat
+
+## error check
+pdirect=(`cat direct.dat`)
+ptree=(`cat tree.dat`)
+
+rm -f ${efile}
+np=${#ptree[@]}
+
+for (( i=2; i< $np; i++ ))
+do
+    pt=`sed -E 's/([+-]?[0-9.]+)[eE]\+?(-?)([0-9]+)/(\1*10^\2\3)/g' <<<"${ptree[i]}"`
+    pd=`sed -E 's/([+-]?[0-9.]+)[eE]\+?(-?)([0-9]+)/(\1*10^\2\3)/g' <<<"${pdirect[i]}"`
+    d=`echo "(${pt}-${pd})" | bc -l | sed s/-//`
+    d=`echo "l($d)/l(10)" | bc -l`
+    echo -n "$d " >> ${efile}
+done
+
+echo >> ${efile}

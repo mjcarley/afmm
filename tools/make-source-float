@@ -1,0 +1,8 @@
+#!/bin/bash
+
+opfile=$1
+
+sed -e s/AFMM_REAL/gfloat/g -e s/_FLOAT/_f/g -e s/FLOATFMT/g/g \
+    -e s/FLOATEXP/1.16e/g \
+    -e s/FFTW_PLAN/fftwf_plan/ \
+    ${opfile}.c.in > ${opfile}-float.c

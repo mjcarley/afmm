@@ -1,0 +1,159 @@
+/* This file is part of AFMM, a Wide-Band Fast Multipole Method code
+ *
+ * Copyright (C) 2022 Michael Carley
+ *
+ * AFMM is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.  AFMM is distributed in the
+ * hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+ * the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ * PURPOSE.  See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with AFMM.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include <stdio.h>
+#include <math.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include <glib.h>
+
+#include <fftw3.h>
+
+#include <afmm.h>
+
+#include "afmm-private.h"
+
+GTimer *timer ;
+gchar *progname ;
+
+static void points_read(FILE *f, gint *np, gint *N, gint *ns,
+			gfloat **rz, gfloat **src)
+
+{
+  gint i, j, k, str ;
+  
+  fscanf(f, "%d %d %d", np, N, ns) ;
+
+  /*FFTW3 stride for C2R transforms*/
+  str = 2*((*N)+2) ;
+
+  *rz = (gfloat *)g_malloc0((*np)*2*sizeof(gfloat)) ;
+  if ( *ns != 0 ) {
+    *src = (gfloat *)
+      fftw_malloc((*np)*str*(*ns)*sizeof(gfloat)) ;
+  } else {
+    src = NULL ;
+  }
+
+  for ( i = 0 ; i < *np ; i ++ ) {
+    fscanf(f, "%g %g", &((*rz)[2*i+0]), &((*rz)[2*i+1])) ;
+    if ( src != NULL ) {
+      /* for ( j = 0 ; j < str*(*ns) ; j ++ ) { */
+      for ( j = 0 ; j < *ns ; j ++ ) {
+	for ( k = 0 ; k <= *N ; k ++ ) {
+	  fscanf(f, "%g", &((*src)[i*(*ns)*str + j*str + 2*k + 0])) ;
+	  fscanf(f, "%g", &((*src)[i*(*ns)*str + j*str + 2*k + 1])) ;
+		 /* &((*src)[i*(*ns)*str + j])) ; */
+	}
+      }
+    }
+  }
+  
+  return ;
+}
+
+gint main(gint argc, gchar **argv)
+
+{
+  gfloat *rz1, *rz, *src, *fld, *work ;
+  gint nsrc, nfld, N, Nf, ns, i, j, n, sstr, fstr ;
+  gchar ch, *sfile, *ffile ;
+  FILE *input, *output ;
+  
+  progname = g_strdup(g_path_get_basename(argv[0])) ;
+  timer = g_timer_new() ;
+
+  output = stdout ;
+  sfile = NULL ; ffile = NULL ;
+  while ( (ch = getopt(argc, argv, "f:s:")) != EOF ) {
+    switch ( ch ) {
+    default: g_assert_not_reached() ; break ;
+    case 'f': ffile = g_strdup(optarg) ; break ;
+    case 's': sfile = g_strdup(optarg) ; break ;
+    }
+  }
+
+  if ( sfile == NULL ) {
+    fprintf(stderr, "%s: source file must be defined\n", progname) ;
+    exit(1) ;    
+  }
+  input = fopen(sfile, "r") ;
+  if ( input == NULL ) {
+    fprintf(stderr, "%s: cannot open source file %s\n", progname, sfile) ;
+    exit(1) ;
+  }
+
+  points_read(input, &nsrc, &N, &ns, &rz1, &src) ;
+
+  fclose(input) ;
+  
+  fprintf(stderr, "%s: %d source points\n", progname, nsrc) ;
+  fprintf(stderr, "%s: modal order %d\n", progname, N) ;
+  fprintf(stderr, "%s: %d source components\n", progname, ns) ;
+
+  if ( ffile == NULL ) {
+    fprintf(stderr, "%s: field point file must be defined\n", progname) ;
+    exit(1) ;    
+  }
+  input = fopen(ffile, "r") ;
+  if ( input == NULL ) {
+    fprintf(stderr, "%s: cannot open field point file %s\n", progname, ffile) ;
+    exit(1) ;
+  }
+
+  points_read(input, &nfld, &Nf, &i, &rz, &fld) ;
+
+  fclose(input) ;
+  
+  fprintf(stderr, "%s: %d field points\n", progname, nfld) ;
+  /* fprintf(stderr, "%s: modal order %d\n", progname, Nf) ; */
+
+  /* g_assert(Nf == N) ; */
+  fld = (gfloat *)
+    fftw_malloc(nfld*2*(N+2)*ns*sizeof(gfloat)) ;
+  
+  work = (gfloat *)g_malloc0((N+1)*sizeof(gfloat)) ;
+
+  sstr = 2*(N+2) ;
+  fstr = 2*(N+2) ;
+
+  fprintf(stderr, "%s: evaluating field; %lg\n",
+	  progname, g_timer_elapsed(timer, NULL)) ;
+  
+  afmm_laplace_field_direct_f(rz1, src, sstr, ns, nsrc, N,
+				  rz, fld, fstr, nfld, TRUE, work) ;
+
+  fprintf(stderr, "%s: field evaluated; %lg\n",
+	  progname, g_timer_elapsed(timer, NULL)) ;
+
+  /* fprintf(output, "%d %d %d\n", nfld, N, ns) ; */
+  for ( i = 0 ; i < nfld ; i ++ ) {
+    fprintf(output, "%g %g", rz[2*i+0], rz[2*i+1]) ;
+    for ( j = 0 ; j < ns ; j ++ ) {
+      for ( n = 0 ; n <= N ; n ++ ) {
+	fprintf(output, " %1.16e %1.16e",
+		fld[i*ns*fstr + j*fstr + 2*n+0],
+		fld[i*ns*fstr + j*fstr + 2*n+1]) ;
+      }
+    }
+    fprintf(output, "\n") ;
+  }    
+  
+  return 0 ;
+}
+

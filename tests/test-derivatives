@@ -1,0 +1,20 @@
+#!/bin/bash
+
+AFMM=../tools/afmm-tests
+
+M=8
+N=4
+z=0.3
+r1=0.7
+r=0.9
+
+for (( m=0; m<M; m++ )) ; do
+    for (( i=0; i<m; i++ )) ; do
+	for (( j=0; j<m-i; j++ )) ; do
+	    ((k=m-i-j))
+	    ##echo ${m}: ${i} ${j} ${k}
+	    ${AFMM} -T derivative -N ${N} -M ${M} \
+		    -z ${z} -R ${r} -r ${r1} -d 3 -i ${i} -j ${j} -k ${k}
+	done
+    done
+done
