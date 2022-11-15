@@ -240,7 +240,7 @@ BLASWRAP = yes
 BLAS_LIBS = -lopenblas
 CC = gcc
 CCDEPMODE = depmode=gcc3
-CFLAGS = -O0 -g -Wall -Werror-implicit-function-declaration -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations  -fopenmp  -mavx -mfma -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
+CFLAGS = -O3 -g -Wall -Werror-implicit-function-declaration -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations  -fopenmp  -mavx -mfma -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 CPP = gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
@@ -367,7 +367,7 @@ top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ..
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) -DG_LOG_DOMAIN=\"AFMM\" \
-	-DAFMM_COMPILER_FLAGS="\"-O0 -g -Wall -Werror-implicit-function-declaration -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations  -fopenmp  -mavx -mfma -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include\""
+	-DAFMM_COMPILER_FLAGS="\"-O3 -g -Wall -Werror-implicit-function-declaration -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations  -fopenmp  -mavx -mfma -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include\""
 
 bin_SCRIPTS = afmm-config
 BUILT_SOURCES = \

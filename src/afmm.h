@@ -23,6 +23,12 @@
 #define AFMM_INDEX_SCALE (1LU << 63)
 #define AFMM_INDEX_SHIFT (1U << 20)
 
+typedef enum {
+  AFMM_INTERACTION_NONE   = 0,
+  AFMM_INTERACTION_DIRECT = 1,
+  AFMM_INTERACTION_S2L    = 2
+} afmm_interaction_t ;
+
 typedef struct _afmm_box_t afmm_box_t ;
 struct _afmm_box_t {
   guint32 i, /**< index of first source point in box */
@@ -33,7 +39,10 @@ struct _afmm_box_t {
 typedef struct _afmm_tree_t afmm_tree_t ;
 struct  _afmm_tree_t {
   gdouble rmin, rmax, zmin, zmax, esep ;
-  afmm_box_t *boxes[AFMM_TREE_MAX_DEPTH+1] ;
+  afmm_box_t *boxes[1 << (AFMM_TREE_MAX_DEPTH+1)] ;
+  gint
+  *ilistd[1 << (AFMM_TREE_MAX_DEPTH+1)],
+    nilistd[1 << (AFMM_TREE_MAX_DEPTH+1)] ;
   guint
   N,
     maxpoints,
@@ -67,6 +76,7 @@ struct  _afmm_tree_t {
 #define afmm_tree_field_order(_t,_l)   ((_t)->order_f[(_l)])
 #define afmm_tree_source_data(_t)      ((_t)->S)
 #define afmm_tree_box_separation(_t)   ((_t)->esep)
+#define afmm_tree_ilists_level(_l)     ((1 << (_l)) - 1)
 /* #define afmm_tree_ */
 
 #define afmm_derivative_offset(_q) ((_q)*((_q)+1)*((_q)+2)/6)
@@ -241,8 +251,20 @@ gint afmm_tree_refine(afmm_tree_t *t) ;
 gint afmm_tree_refine_f(afmm_tree_t *t) ;
 gint afmm_index_decode(guint64 d, guint32 *x, guint32 *y) ;
 guint64 afmm_index_encode(guint32 x, guint32 y) ;
-gboolean afmm_boxes_are_separated(afmm_tree_t *t, guint level,
-				  guint i, guint j) ;
+gboolean afmm_boxes_separated(guint i, guint j, gdouble etol) ;
+gboolean afmm_grid_boxes_separated(guint ir, guint iz,
+				   guint jr, guint jz,
+				   gdouble etol) ;
+gint afmm_trace_interactions(afmm_tree_t *t, guint r_trace, FILE *f) ;
+gint afmm_tree_interaction_list(afmm_tree_t *t, guint d, guint i, guint j,
+				guint *ilist, gint *ni) ;
+gint afmm_write_interaction_list(afmm_tree_t *t, guint d,
+				 guint ir, guint iz,
+				 FILE *f) ;
+gint afmm_radius_interaction_list(guint d, guint i0, gdouble etol,
+				  guint *ilist, gint *ni, gint nimax) ;
+gint afmm_write_radius_interaction_list(guint d, guint i, gdouble etol,
+					FILE *f) ;
 
 guint64 afmm_box_first_child(guint64 idx) ;
 guint64 afmm_box_parent(guint64 idx) ;

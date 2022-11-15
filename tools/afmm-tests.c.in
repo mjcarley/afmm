@@ -91,6 +91,20 @@ static void random_coefficients(AFMM_REAL *C, gint N)
   return ;
 }
 
+/* static void unit_coefficients(AFMM_REAL *C, gint N) */
+
+/* { */
+/*   gint i ; */
+
+/*   C[0] = 1.0 ; C[1] = 0.0 ; */
+  
+/*   for ( i = 1 ; i <= N ; i ++ ) { */
+/*     C[2*i+0] = 1.0 ; C[2*i+1] = 1.0 ; */
+/*   } */
+  
+/*   return ; */
+/* } */
+
 static void elliptic_test(void)
 
 {
@@ -375,15 +389,16 @@ static void expansion_test(AFMM_REAL r, AFMM_REAL z,
 
 {
   AFMM_REAL *C, *S, *dG, rz[2], work[1024], *f, *g ;
-  AFMM_REAL Z, Z1, R, R1 ;
-  gint dist, i, j, n, p, sdist, ns, nd ;
+  AFMM_REAL Z, Z1, R, R1, sc ;
+  gint dist, i, j, k, l, n, p, sdist, ns, nd, off ;
   
-  ns = 3 ;
+  ns = 3 ; sc = 1.7 ;
   
   fprintf(stderr, "box source expansion test\n") ;
   fprintf(stderr, "=========================\n") ;
   fprintf(stderr, "(r , z ) = (%FLOATFMT, %FLOATFMT)\n", r, z) ;
   fprintf(stderr, "(r1, z1) = (%FLOATFMT, %FLOATFMT)\n", r1, z1) ;
+  fprintf(stderr, "scale = %FLOATFMT\n", sc) ;
   fprintf(stderr, "N = %d\n", N) ;
   fprintf(stderr, "L = %d\n", L) ;
   fprintf(stderr, "npts = %d\n", nrz1) ;
@@ -394,12 +409,14 @@ static void expansion_test(AFMM_REAL r, AFMM_REAL z,
   dist = 2*N + 4 ;
   C = (AFMM_REAL *)fftw_malloc(nrz1*ns*dist*sizeof(AFMM_REAL)) ;
   for ( i = 0 ; i < nrz1*ns ; i ++ ) {
+    /* unit_coefficients(&(C[i*dist]), N) ; */
     random_coefficients(&(C[i*dist]), N) ;
   }
   f = (AFMM_REAL *)fftw_malloc(ns*dist*sizeof(AFMM_REAL)) ;
   g = (AFMM_REAL *)fftw_malloc(ns*dist*sizeof(AFMM_REAL)) ;
 
-  /*local source moments (number of points, number of source terms,
+  /*
+   * local source moments (number of points, number of source terms,
    * number of modes, number of derivatives, times two for complex)
    */
   /*number of points per source point per source component*/
@@ -427,27 +444,42 @@ static void expansion_test(AFMM_REAL r, AFMM_REAL z,
 				&(S[i*(N+1)*sdist]), sdist) ;
     }
   }
-
+  
   /*modal Green's function derivatives*/
   nd = afmm_derivative_offset(L+1) ;
   dG = (AFMM_REAL *)g_malloc0((N+1)*nd*sizeof(AFMM_REAL)) ;
   nd = afmm_laplace_gfunc_derivatives_FLOAT(N, L, r, r1, z-z1, dG) ;  
-
+  g_assert(nd == afmm_derivative_offset(L+1)) ;
+  
   if ( forward ) {
-    Z = z ; Z1 = z1 ;
+    Z = sc*z ; Z1 = sc*z1 ;
   } else {
-    Z = z1 ; Z1 = z ;
+    Z = sc*z1 ; Z1 = sc*z ;
   }
 
   if ( outward ) {
-    R = r ; R1 = r1 ;
+    R = sc*r ; R1 = sc*r1 ;
   } else {
-    R = r1 ; R1 = r ;
+    R = sc*r1 ; R1 = sc*r ;
   }
 
+  /*scale the Green's function derivatives*/
+  for ( n = 0 ; n <= N ; n ++ ) {
+    for ( l = 0 ; l <= L ; l ++ ) {
+      off = afmm_derivative_offset(l) ;
+      for ( k = 0 ; k <= l ; k ++ ) {
+	for ( i = 0 ; i <= l-k ; i ++ ) {
+	  j = l - k -i ;
+	  dG[n*nd+off+afmm_derivative_index_ijk(i,j,k)] /= pow(sc, l+1) ;
+	}
+      }
+    }
+  }
+  
   rz[0] = R ; rz[1] = Z ;
   for ( j = 0 ; j < nrz1 ; j ++ ) {
-    rz1[2*j+0] += R1 ; rz1[2*j+1] += Z1 ;
+    rz1[2*j+0] = rz1[2*j+0] + R1 ;
+    rz1[2*j+1] = rz1[2*j+1] + Z1 ;
   }
 
   afmm_laplace_field_direct_FLOAT(rz1, C, dist, ns, nrz1, N,
@@ -455,7 +487,7 @@ static void expansion_test(AFMM_REAL r, AFMM_REAL z,
 
   afmm_laplace_field_eval_FLOAT(N, L, dG, nd, S, sdist, ns, g, dist,
 				forward, outward, TRUE) ;
-  
+
   for ( n = 0 ; n <= N ; n ++ ) {
     fprintf(stderr, "%d", n) ;
     for ( i = 0 ; i < ns ; i ++ ) {
@@ -934,34 +966,20 @@ static void morton_test(gint depth)
   return ;
 }
 
-static void interaction_test(void)
+static void interaction_test(guint d, guint i, guint j)
 
 {
-  guint64 b, ilist[64] ;
-  guint32 x, y ;
-  guint depth ;
-  gint ni, i ;
-
-  depth = 4 ;
-  x = 2 ; y = 5 ;
+  gdouble etol ;
   
   fprintf(stderr, "box interaction list\n") ;
   fprintf(stderr, "====================\n") ;
-  fprintf(stderr, "(x,y) = (%u, %u)\n", x, y) ;
-  fprintf(stderr, "depth = %u\n", depth) ;
-  
-  b = afmm_index_encode(x, y) ;
+  fprintf(stderr, "(i,j) = (%u, %u)\n", i, j) ;
+  fprintf(stderr, "depth = %u\n", d) ;
 
-  afmm_interaction_list(b, depth, ilist, &ni) ;
+  etol = 3.0/2.0/sqrt(2.0) - 1 ;
 
-  fprintf(stderr, "%d interactions\n", ni) ;
+  afmm_write_radius_interaction_list(d, i, etol, stdout) ;
 
-  fprintf(stdout, "%u %u\n", x, y) ;
-  for ( i = 0 ; i < ni ; i ++ ) {
-    afmm_index_decode(ilist[i], &x, &y) ;
-    fprintf(stdout, "%u %u\n", x, y) ;
-  }
-  
   return ;
 }
 
@@ -1263,7 +1281,7 @@ gint main(gint argc, gchar **argv)
   }
 
   if ( test == 14 ) {
-    interaction_test() ;
+    interaction_test((guint)d, (guint)i, (guint)j) ;
     
     return 0 ;
   }
