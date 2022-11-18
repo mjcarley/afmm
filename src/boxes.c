@@ -32,21 +32,6 @@ const guint afmm_ilist_di[] = {0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3} ;
 const guint afmm_ilist_dj[] = {2, 3, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3} ;
 #endif /*AFMM_SINGLE_PRECISION*/
 
-/* static gboolean boxes_separated(AFMM_REAL r, AFMM_REAL r1, AFMM_REAL z, */
-/* 				AFMM_REAL dr, gdouble esep) */
-
-/* { */
-/*   AFMM_REAL chi ; */
-
-/*   g_assert(r >= r1) ; */
-
-/*   if ( r != r1 ) r1 += dr ; */
-
-/*   chi = 0.5*(r*r + r1*r1 + z*z)/r/r1 ; */
-  
-/*   return ( chi > 1.0 + esep ) ; */
-/* } */
-
 afmm_tree_t *AFMM_FUNCTION_NAME(afmm_tree_new)(AFMM_REAL rmin, AFMM_REAL rmax,
 					       AFMM_REAL zmin, AFMM_REAL zmax,
 					       guint maxpoints)
@@ -89,9 +74,6 @@ afmm_tree_t *AFMM_FUNCTION_NAME(afmm_tree_new)(AFMM_REAL rmin, AFMM_REAL rmax,
   t->size = sizeof(AFMM_REAL) ;
 
   afmm_tree_source_data(t) = NULL ;
-
-  /* memset(t->ilimits, 0, (AFMM_TREE_MAX_DEPTH+1)*sizeof(guint)) ; */
-  /* memset(t->ilistd, 0, (1 << (AFMM_TREE_MAX_DEPTH+1))*sizeof(gint *)) ; */
   
   return t ;
 }
@@ -267,9 +249,6 @@ gint AFMM_FUNCTION_NAME(afmm_tree_coefficient_init)(afmm_tree_t *t,
     g_error("%s: tree has invalid number of components in source terms (%d)",
 	    __FUNCTION__, nq) ;
   
-  /* g_assert(t->problem == WBFMM_PROBLEM_HELMHOLTZ ) ; */
-  /* /\* g_assert(t->ns == 1) ; *\/ */
-  
   g_assert(l <= afmm_tree_depth(t)) ;
 
   /*number of boxes at level l*/
@@ -333,8 +312,6 @@ gint AFMM_FUNCTION_NAME(afmm_tree_leaf_expansions)(afmm_tree_t *t,
   AFMM_REAL *rz, r, rb, z, zb, *S, *C ;
   gint nq = afmm_tree_source_size(t) ;
   gint N = afmm_tree_mode_number(t) ;
-
-  /* g_assert(nq == 1) ; */
 
   /*depth of leaves*/
   d = afmm_tree_depth(t) ;
@@ -445,7 +422,6 @@ gint AFMM_FUNCTION_NAME(afmm_tree_expansion_eval_field)(afmm_tree_t *t,
 						       afmm_tree_z_max(t),
 						       &r1, &rb, &z1, &zb) ;
       r1 += 0.5*rb ; z1 += 0.5*zb ;
-      /* fprintf(stderr, "%lu %g %g %g %g\n", i, r1, z1, rb, zb) ; */
       nd = AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
 							      r, r1, z-z1, dG) ;
       C = boxes[i].Cs ;
@@ -591,72 +567,6 @@ gint AFMM_FUNCTION_NAME(afmm_upward_pass)(afmm_tree_t *t, guint level,
   return 0 ;
 }
 
-/* static void box_expansion_shift(afmm_box_t *boxes, gint N, */
-/* 				gint Ls, gint Lp, gint ns, */
-/* 				guint i, guint j, guint di, guint dj, */
-/* 				guint nb, AFMM_REAL *dG, gint nd) */
-
-/* { */
-/*   gint sdist, pdist ; */
-/*   guint64 is, ip ; */
-/*   AFMM_REAL *S, *P ; */
-
-/*   if ( i + di >= nb ) return ; */
-  
-/*   sdist = 2*afmm_derivative_offset_2(Ls+1) ; */
-/*   pdist = 2*afmm_derivative_offset_2(Lp+1) ; */
-
-/*   if ( j + dj < nb ) { */
-/*     is = afmm_index_encode(i, j) ; ip = afmm_index_encode(i+di, j+dj) ; */
-/*     S = boxes[is].Cs ;  P = boxes[ip].Cf ; */
-/*     AFMM_FUNCTION_NAME(afmm_laplace_source_to_local)(N, Ls+Lp+1, dG, nd, */
-/* 						     S, sdist, Ls, ns, */
-/* 						     P, pdist, Lp, TRUE, TRUE) ; */
-/*     is = afmm_index_encode(i+di, j+dj) ; ip = afmm_index_encode(i, j) ; */
-/*     S = boxes[is].Cs ;  P = boxes[ip].Cf ; */
-/*     AFMM_FUNCTION_NAME(afmm_laplace_source_to_local)(N, Ls+Lp+1, dG, nd, */
-/* 						     S, sdist, Ls, ns, */
-/* 						     P, pdist, Lp, */
-/* 						     FALSE, FALSE) ; */
-/*   } */
-
-/*   /\* return ; *\/ */
-/*   if ( di == 0 || dj == 0) return ; */
-  
-/*   if ( j >= dj ) { */
-/*     is = afmm_index_encode(i, j) ; ip = afmm_index_encode(i+di, j-dj) ; */
-/*     S = boxes[is].Cs ;  P = boxes[ip].Cf ; */
-/*     AFMM_FUNCTION_NAME(afmm_laplace_source_to_local)(N, Ls+Lp+1, dG, nd, */
-/* 						     S, sdist, Ls, ns, */
-/* 						     P, pdist, Lp, */
-/* 						     FALSE, TRUE) ; */
-/*     is = afmm_index_encode(i+di, j-dj) ; ip = afmm_index_encode(i, j) ; */
-/*     S = boxes[is].Cs ;  P = boxes[ip].Cf ; */
-/*     AFMM_FUNCTION_NAME(afmm_laplace_source_to_local)(N, Ls+Lp+1, dG, nd, */
-/* 						     S, sdist, Ls, ns, */
-/* 						     P, pdist, Lp, */
-/* 						     TRUE, FALSE) ; */
-/*   } */
-  
-/*   return ; */
-/* } */
-
-/* static gboolean boxes_are_neighbours(guint64 i, guint64 j) */
-
-/* { */
-/*   guint32 ix, iy, jx, jy ; */
-
-/*   afmm_index_decode(i, &ix, &iy) ; */
-/*   afmm_index_decode(j, &jx, &jy) ; */
-
-/*   if ( ix > jx+1 ) return FALSE ; */
-/*   if ( jx > ix+1 ) return FALSE ; */
-/*   if ( iy > jy+1 ) return FALSE ; */
-/*   if ( jy > iy+1 ) return FALSE ; */
-  
-/*   return TRUE ; */
-/* } */
-
 static void box_expansion_shift_s2l(afmm_box_t *boxes, gint N,
 				    gint Ls, gint Lp, gint ns,
 				    guint i, guint j, guint di, guint dj,
@@ -668,24 +578,9 @@ static void box_expansion_shift_s2l(afmm_box_t *boxes, gint N,
   gint sdist, pdist ;
   guint64 is, ip ;
   AFMM_REAL *S, *P ;
-  /* guint64 icheck ; */
   guint64 sp, pp ;
   
   if ( i + di >= nb ) return ;
-
-  /* if ( nb == 1  ) icheck =   0 ; */
-  /* if ( nb == 2  ) icheck =   1 ; */
-  /* if ( nb == 4  ) icheck =   7 ; */
-  /* if ( nb == 8  ) icheck =  28 ; */
-  /* if ( nb == 16 ) icheck = 113 ; */
-  /* if ( nb == 32 ) icheck = 454 ; */
-  /* if ( nb == 1  ) icheck =   0 ; */
-  /* if ( nb == 2  ) icheck =   1 ; */
-  /* if ( nb == 4  ) icheck =   5 ; */
-  /* if ( nb == 8  ) icheck =  22 ; */
-  /* if ( nb == 16 ) icheck =  91 ; */
-  /* if ( nb == 32 ) icheck = 367 ; */
-  /* if ( nb == 64 ) icheck =   8 ; */
   
   sdist = 2*afmm_derivative_offset_2(Ls+1) ;
   pdist = 2*afmm_derivative_offset_2(Lp+1) ;
@@ -694,33 +589,13 @@ static void box_expansion_shift_s2l(afmm_box_t *boxes, gint N,
     is = afmm_index_encode(i, j) ; ip = afmm_index_encode(i+di, j+dj) ;
     sp = afmm_box_parent(is) ; 
     pp = afmm_box_parent(ip) ;
-    /* if ( boxes_are_neighbours(sp, pp) ) */
-    if ( !afmm_boxes_separated(sp, pp, etol) ) 
-      {
-    S = boxes[is].Cs ;  P = boxes[ip].Cf ;
-    /* if ( S[0] != 0 ) { */
-    /*   fprintf(stderr, "nb = %u; box %u (%u,%u) to %u (%u,%u): P[0] = %lg ", */
-    /* 	      nb, is, i, j, ip, i+di, j+dj, P[0]) ; */
-    /* } */
-    /* if ( ip == icheck && S[0] != 0 ) */
-    /*   fprintf(stderr, "interaction: nb = %u; i=%u, j=%u, di=%u, dj=%u\n", */
-    /* 	      nb, i, j, di, dj) ; */
-    AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l1, S, sdist, Ls, ns,
+    if ( !afmm_boxes_separated(sp, pp, etol) ) {
+      S = boxes[is].Cs ;  P = boxes[ip].Cf ;
+      AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l1, S, sdist, Ls, ns,
 					       P, pdist, Lp) ;
-    /* if ( S[0] != 0 ) fprintf(stderr, "(%lg)\n", P[0]) ; */
-    S = boxes[ip].Cs ; P = boxes[is].Cf ;
-    /* if ( S[0] != 0 ) { */
-    /*   fprintf(stderr, "nb = %u; box %u (%u,%u) to %u (%u,%u): P[0] = %lg ", */
-    /* 	      nb, ip, i+di, j+dj, is, i, j, P[0]) ; */
-    /*   /\* fprintf(stderr, "nb = %u; box %u to %u: P[0] = %lg ", *\/ */
-    /*   /\* 	      nb, ip, is, P[0]) ; *\/ */
-    /* } */
-    /* if ( is == icheck && S[0] != 0 ) */
-    /*   fprintf(stderr, "interaction: nb = %u; i=%u, j=%u, di=%u, dj=%u\n", */
-    /* 	      nb, i, j, di, dj) ; */
-    AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l4, S, sdist, Ls, ns,
+      S = boxes[ip].Cs ; P = boxes[is].Cf ;
+      AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l4, S, sdist, Ls, ns,
 					       P, pdist, Lp) ;
-    /* if ( S[0] != 0 ) fprintf(stderr, "(%lg)\n", P[0]) ; */
     }
   }
 
@@ -730,52 +605,18 @@ static void box_expansion_shift_s2l(afmm_box_t *boxes, gint N,
     is = afmm_index_encode(i, j) ; ip = afmm_index_encode(i+di, j-dj) ;
     sp = afmm_box_parent(is) ; 
     pp = afmm_box_parent(ip) ;
-    /* if ( boxes_are_neighbours(sp, pp) ) */
-    if ( !afmm_boxes_separated(sp, pp, etol) )
-      {
-    S = boxes[is].Cs ;  P = boxes[ip].Cf ;
-    /* if ( S[0] != 0 ) { */
-    /*   fprintf(stderr, "nb = %u; box %u (%u,%u) to %u (%u,%u): P[0] = %lg ", */
-    /* 	      nb, is, i, j, ip, i+di, j-dj, P[0]) ; */
-      /* fprintf(stderr, "nb = %u; box %u to %u: P[0] = %lg ", */
-      /* 	      nb, is, ip, P[0]) ; */
-    /* } */
-    /* if ( ip == icheck && S[0] != 0 ) */
-    /*   fprintf(stderr, "interaction: nb = %u; i=%u, j=%u, di=%u, dj=%u\n", */
-    /* 	      nb, i, j, di, dj) ; */
-    AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l3, S, sdist, Ls, ns,
-					       P, pdist, Lp) ;
-    /* if ( S[0] != 0 ) fprintf(stderr, "(%lg)\n", P[0]) ; */
-    S = boxes[ip].Cs ; P = boxes[is].Cf ;
-    /* if ( S[0] != 0 ) { */
-      /* fprintf(stderr, "nb = %u; box %u (%u,%u) to %u (%u,%u): P[0] = %lg ", */
-      /* 	      nb, ip, i+di, j-dj, is, i, j, P[0]) ; */
-      /* fprintf(stderr, "nb = %u; box %u to %u: P[0] = %lg ", */
-      /* 	      nb, ip, is, P[0]) ; */
-    /* } */
-    /* if ( is == icheck && S[0] != 0 ) */
-    /*   fprintf(stderr, "interaction: nb = %u; i=%u, j=%u, di=%u, dj=%u\n", */
-    /* 	      nb, i, j, di, dj) ; */
-    AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l2, S, sdist, Ls, ns,
-					       P, pdist, Lp) ;
-    /* if ( S[0] != 0 ) fprintf(stderr, "(%lg)\n", P[0]) ; */
+    if ( !afmm_boxes_separated(sp, pp, etol) ) {
+      S = boxes[is].Cs ;  P = boxes[ip].Cf ;
+      AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l3, S, sdist, Ls, ns,
+						 P, pdist, Lp) ;
+      S = boxes[ip].Cs ; P = boxes[is].Cf ;
+      AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(N, s2l2, S, sdist, Ls, ns,
+						 P, pdist, Lp) ;
     }
   }
   
   return ;
 }
-
-/* static void box_separation(afmm_tree_t *t, guint i, guint di, guint dj, */
-/* 			   guint nb, */
-/* 			   AFMM_REAL *r, AFMM_REAL *r1, AFMM_REAL *dz) */
-
-/* { */
-/*   *r1 = t->rmin + (t->rmax - t->rmin)/nb*(i+   0.5) ; */
-/*   *r  = t->rmin + (t->rmax - t->rmin)/nb*(i+di+0.5) ; */
-/*   *dz = (t->zmax - t->zmin)/nb*dj ; */
-    
-/*   return ; */
-/* } */
 
 gint AFMM_FUNCTION_NAME(afmm_downward_pass)(afmm_tree_t *t, guint level,
 					    AFMM_REAL *work,

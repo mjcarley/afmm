@@ -40,9 +40,6 @@ typedef struct _afmm_tree_t afmm_tree_t ;
 struct  _afmm_tree_t {
   gdouble rmin, rmax, zmin, zmax, esep ;
   afmm_box_t *boxes[1 << (AFMM_TREE_MAX_DEPTH+1)] ;
-  gint
-  *ilistd[1 << (AFMM_TREE_MAX_DEPTH+1)],
-    nilistd[1 << (AFMM_TREE_MAX_DEPTH+1)] ;
   guint
   N,
     maxpoints,
@@ -76,7 +73,6 @@ struct  _afmm_tree_t {
 #define afmm_tree_field_order(_t,_l)   ((_t)->order_f[(_l)])
 #define afmm_tree_source_data(_t)      ((_t)->S)
 #define afmm_tree_box_separation(_t)   ((_t)->esep)
-#define afmm_tree_ilists_level(_l)     ((1 << (_l)) - 1)
 /* #define afmm_tree_ */
 
 #define afmm_derivative_offset(_q) ((_q)*((_q)+1)*((_q)+2)/6)
@@ -172,6 +168,10 @@ gint afmm_laplace_shift_s2l_f(gint N, gfloat *S2L,
 			      gfloat *S, gint sdist, gint LS,
 			      gint ns,
 			      gfloat *P, gint pdist, gint LP) ;
+gint afmm_laplace_s2l_matrix_write(gint n, gdouble *S2L, gint LS, gint LP,
+				   FILE *f) ;
+gint afmm_laplace_s2l_matrix_write_f(gint n, gfloat *S2L, gint LS, gint LP,
+				     FILE *f) ;
 
 gint afmm_expansion_eval(gdouble dr, gdouble dz,
 			 gint N, gint L,

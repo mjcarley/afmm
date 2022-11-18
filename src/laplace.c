@@ -114,39 +114,6 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_gfunc_comp)(gint N,
   return 0 ;
 }
 
-/* static void laplace_recursion_r(AFMM_REAL *dG, gint nd, gint N, */
-/* 				AFMM_REAL r, gint i, gint j, gint k) */
-
-/* { */
-/*   gint idxo, idx1, idx2, n, u ; */
-/*   AFMM_REAL rp ; */
-  
-/*   g_assert(i >= 2) ; */
-  
-/*   /\*output index*\/ */
-/*   idxo = afmm_derivative_offset(i+j+k) + afmm_derivative_index_ijk(i,j,k) ; */
-
-/*   for ( n = 0 ; n <= N ; n ++ ) { */
-/*     idx1 = afmm_derivative_offset(i+j+k) + */
-/*       afmm_derivative_index_ijk(i-2,j,k+2) ; */
-/*     dG[n*nd + idxo] = -dG[n*nd+idx1]*(k+2)*(k+1)/(i-1)/i ; */
-/*     rp = 1.0/r ; */
-/*     for ( u = 0 ; u <= i-2 ; u ++ ) { */
-/*       idx1 = afmm_derivative_offset(i+j+k-u-2) + */
-/* 	afmm_derivative_index_ijk(i-u-2,j,k) ; */
-/*       idx2 = afmm_derivative_offset(i+j+k-u-1) + */
-/* 	afmm_derivative_index_ijk(i-u-1,j,k) ; */
-/*       /\* dG[n*nd + idxo] += (n*n*dG[n*nd+idx1]*rp/r*(u+1) -  *\/ */
-/*       /\* 			  dG[n*nd+idx2]*rp*(i-u-1))/(i-1)/i ; *\/ */
-/*       dG[n*nd + idxo] += (n*n*dG[n*nd+idx1]/r*(u+1) -  */
-/* 			  dG[n*nd+idx2]*(i-u-1))*rp/(i-1)/i ; */
-/*       rp /= -r ; */
-/*     } */
-/*   } */
-
-/*   return ; */
-/* } */
-
 static void laplace_recursion_r(AFMM_REAL *dG, gint nd, gint N,
 				AFMM_REAL r, gint i, gint j, gint k)
 
@@ -877,5 +844,38 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_shift_s2l)(gint N,
     }
   }
   
+  return 0 ;
+}
+
+gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix_write)(gint n,
+						       AFMM_REAL *S2L,
+						       gint LS,
+						       gint LP,
+						       FILE *f)
+
+{
+  gint s2lr, s2lc, i, j ;
+  AFMM_REAL *s2l ;
+
+  s2lr = afmm_derivative_offset_2(LP+1) ;
+  s2lc = afmm_derivative_offset_2(LS+1) ;
+
+  s2l = &(S2L[n*s2lr*s2lc]) ;
+#ifdef AFMM_SINGLE_PRECISION
+  for ( i = 0 ; i < s2lr ; i ++ ) {
+    for ( j = 0 ; j < s2lc ; j ++ ) {
+      fprintf(f, "%e ", s2l[i*s2lc+j]) ;
+    }
+    fprintf(f, "\n") ;
+  }
+#else /*AFMM_SINGLE_PRECISION*/
+  for ( i = 0 ; i < s2lr ; i ++ ) {
+    for ( j = 0 ; j < s2lc ; j ++ ) {
+      fprintf(f, "%le ", s2l[i*s2lc+j]) ;
+    }
+    fprintf(f, "\n") ;
+  }
+#endif /*AFMM_SINGLE_PRECISION*/
+
   return 0 ;
 }

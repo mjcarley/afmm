@@ -1094,14 +1094,6 @@ static void s2l_test(gfloat r, gfloat z,
   memset(g, 0, ns*dist*sizeof(gfloat)) ;
   afmm_expansion_eval_f(rz[0], rz[1], N, LP, Pm, pdist, ns, g, dist) ;
   fprintf(stderr, "  local field expansion evaluated at (dr,dz)\n") ;
-
-  /* n = 7 ; */
-  /* for ( s = 0 ; s < ns ; s ++ ) { */
-  /*   fprintf(stderr, "%lg %lg\n", Pm[(n*ns+s)*pdist+0], P[(n*ns+s)*pdist+0]) ; */
-  /*   fprintf(stderr, "%lg %lg\n", Pm[(n*ns+s)*pdist+1], P[(n*ns+s)*pdist+1]) ; */
-  /* } */
-  
-  /* return ; */
   
   if ( forward ) {
     Z = z ; Z1 = z1 ;
@@ -1135,6 +1127,8 @@ static void s2l_test(gfloat r, gfloat z,
     }
     fprintf(stderr, "\n") ;
   }
+
+  /* afmm_laplace_s2l_matrix_write_f(0, S2L, LS, LP, stdout) ; */
   
   return ;
 }

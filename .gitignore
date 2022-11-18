@@ -1,0 +1,26 @@
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+## don't include emacs backups
+*~
+
+## don't include intermediate data files
+*.dat
+
+## scratch directory
+scratch
+
+## working notes
+notes
+
+## octave test files
+octave
+
+## m4 cache
+autom4te.cache

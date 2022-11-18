@@ -68,7 +68,8 @@ gint main(gint argc, gchar **argv)
 {
   gfloat rmin, rmax, zmin, zmax, *rz1, *rz, *C, *fld, *work ;
   guint npts, ns, N, Nf, order[48] = {0}, order_s, order_f, order_max ;
-  guint depth, order_s_max, order_f_max, r_trace, z_trace ;
+  guint depth, order_s_max, order_f_max ;
+  /* guint r_trace, z_trace ; */
   gint i, j, k, nrz1, cdist, nfld, testdepth, wsize ;
   gchar ch, *sfile, *ffile ;
   afmm_tree_t *tree ;
@@ -84,7 +85,7 @@ gint main(gint argc, gchar **argv)
   /*set to FALSE to suppress downward propagation of field
     expansions (so only local interactions are included)*/
   downward = TRUE ;
-  r_trace = z_trace = 65536 ;
+  /* r_trace = z_trace = 65536 ; */
   trace_field = FALSE ; trace_source = FALSE ;
   /* trace_field = TRUE ; */
   /* trace_source = TRUE ; */
@@ -92,15 +93,15 @@ gint main(gint argc, gchar **argv)
   progname = g_strdup(g_path_get_basename(argv[0])) ;
   timer = g_timer_new() ;
 
-  while ( (ch = getopt(argc, argv, "D:d:F:f:I:J:lR:r:S:s:Z:z:")) != EOF ) {
+  while ( (ch = getopt(argc, argv, "D:d:F:f:lR:r:S:s:Z:z:")) != EOF ) {
     switch ( ch ) {
     default: g_assert_not_reached() ; break ;
     case 'D': depth = atoi(optarg) ; break ;
     case 'd': testdepth = atoi(optarg) ; break ;
     case 'F': order_f = atoi(optarg) ; break ;
     case 'f': ffile = g_strdup(optarg) ; break ;
-    case 'I': r_trace = atoi(optarg) ; break ;
-    case 'J': z_trace = atoi(optarg) ; break ;
+    /* case 'I': r_trace = atoi(optarg) ; break ; */
+    /* case 'J': z_trace = atoi(optarg) ; break ; */
     case 'l': downward = FALSE ; break ;
     case 'R': rmax = atof(optarg) ; break ; 
     case 'r': rmin = atof(optarg) ; break ; 
@@ -187,12 +188,12 @@ gint main(gint argc, gchar **argv)
     afmm_tree_refine_f(tree) ;
   }
 
-  if ( r_trace < 65536 && z_trace == 65536 ) {
+  /* if ( r_trace < 65536 && z_trace == 65536 ) { */
 
-    afmm_trace_interactions(tree, r_trace, stdout) ;
+  /*   afmm_trace_interactions(tree, r_trace, stdout) ; */
 
-    return 0 ;
-  }
+  /*   return 0 ; */
+  /* } */
 
   /* if ( r_trace < 65536 && z_trace < 65536 ) { */
 
