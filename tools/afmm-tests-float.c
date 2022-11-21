@@ -648,7 +648,7 @@ static void tree_test(gfloat *rz1, gint nrz1)
   fprintf(stderr, "%d points\n", nrz1) ;
   fprintf(stderr, "depth: %u\n", depth) ;
   
-  tree = afmm_tree_new_f(rmin, rmax, zmin, zmax, nrz1) ;
+  tree = afmm_tree_new_f(rmin, rmax, zmin, zmax, nrz1, 0) ;
 
   afmm_tree_add_points_f(tree, rz1, 2*sizeof(gfloat), nrz1, FALSE) ;
 
@@ -991,9 +991,11 @@ static void s2l_test(gfloat r, gfloat z,
 
 {
   gfloat *C, *P, *S, *Pm, *dG, *S2L, rz[32], work[1024], *f, *g ;
-  gfloat Z, Z1, R, R1 ;
-  gint dist, i, j, n, p, pdist, sdist, nd, LS, LP ;
-    
+  gfloat *S2Lfo, *S2Lfi, *S2Lbo, *S2Lbi, *Sc ;
+  gfloat Z, Z1, R, R1, emax ;
+  gint dist, i, j, k, n, p, pdist, sdist, nd, LS, LP ;
+  gint s2lr, s2lc ;
+  
   LS = L/2 - 1 ; LP = L - LS ;
   rz[0] = 0.1 ; rz[1] = -0.11 ;
 
@@ -1066,6 +1068,22 @@ static void s2l_test(gfloat r, gfloat z,
 			       afmm_derivative_offset(LS+1)*
 			       afmm_derivative_offset(LP+1)*
 			       sizeof(gfloat)) ;
+  S2Lfo = (gfloat *)g_malloc0((N+1)*
+				 afmm_derivative_offset(LS+1)*
+				 afmm_derivative_offset(LP+1)*
+				 sizeof(gfloat)) ;
+  S2Lfi = (gfloat *)g_malloc0((N+1)*
+				 afmm_derivative_offset(LS+1)*
+				 afmm_derivative_offset(LP+1)*
+				 sizeof(gfloat)) ;
+  S2Lbo = (gfloat *)g_malloc0((N+1)*
+				 afmm_derivative_offset(LS+1)*
+				 afmm_derivative_offset(LP+1)*
+				 sizeof(gfloat)) ;
+  S2Lbi = (gfloat *)g_malloc0((N+1)*
+				 afmm_derivative_offset(LS+1)*
+				 afmm_derivative_offset(LP+1)*
+				 sizeof(gfloat)) ;
   
   /*translate local source expansion to find local field*/
   afmm_laplace_source_to_local_f(N, L, dG, nd,
@@ -1077,9 +1095,25 @@ static void s2l_test(gfloat r, gfloat z,
   /*generate the S2L matrix*/
   afmm_laplace_s2l_matrix_f(N, L, dG, nd, LS, LP,
 				forward, outward, S2L) ;
+
+  /*generate four at once and check*/
+  afmm_laplace_s2l_matrices_f(N, L, dG, nd, LS, LP,
+				  S2Lfo, S2Lfi, S2Lbo, S2Lbi) ;
+  if ( forward ) {
+    if ( outward ) Sc = S2Lfo ; else Sc = S2Lfi ;
+  } else {
+    if ( outward ) Sc = S2Lbo ; else Sc = S2Lbi ;
+  }    
   /*size of S2L*/
-  /* s2lr = afmm_derivative_offset_2(LP+1) ; */
-  /* s2lc = afmm_derivative_offset_2(LS+1) ; */
+  s2lr = afmm_derivative_offset_2(LP+1) ;
+  s2lc = afmm_derivative_offset_2(LS+1) ;
+
+  emax = 0 ;
+  for ( k = 0 ; i < s2lr*s2lc ; i ++ ) {
+    emax = MAX(emax, ABS(Sc[k] - S2L[k])) ;
+  }
+  fprintf(stderr, "maximum matrix error: %g\n", emax) ;
+  
   /* for ( n = 0 ; n <= N ; n ++ ) { */
   /*   s2l = &(S2L[n*s2lr*s2lc]) ; */
   /*   for ( s = 0 ; s < ns ; s ++ ) { */

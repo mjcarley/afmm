@@ -150,7 +150,7 @@ gint main(gint argc, gchar **argv)
 
   npts = nrz1 + nfld ;
 
-  tree = afmm_tree_new_f(rmin, rmax, zmin, zmax, npts) ;
+  tree = afmm_tree_new_f(rmin, rmax, zmin, zmax, nrz1, nfld) ;
 
   /* afmm_tree_box_separation(tree) = 1e-2 ; */
   
@@ -183,6 +183,7 @@ gint main(gint argc, gchar **argv)
   
   /*add points to the tree*/
   afmm_tree_add_points_f(tree, rz1, 2*sizeof(gfloat), nrz1, FALSE) ;
+  afmm_tree_add_field_f(tree, rz, 2*sizeof(gfloat), nfld, FALSE) ;
   
   for ( i = 1 ; i <= depth ; i ++ ) {
     afmm_tree_refine_f(tree) ;
@@ -280,29 +281,27 @@ gint main(gint argc, gchar **argv)
   fprintf(stderr, "%s: downward pass completed; %lg\n",
 	  progname, g_timer_elapsed(timer, NULL)) ;
 
-  for ( i = 0 ; i < nfld ; i ++ ) {
-    /* fprintf(stderr, "%d\n", i) ; */
-    /* afmm_tree_expansion_eval_field_f(tree, testdepth, */
-    /* 					 rz[2*i+0], rz[2*i+1], */
-    /* 					 &(fld[i*ns*(2*N+4)]), work) ; */
-    if ( trace_field ) {
-      guint64 idx, jdx ;
-      idx = afmm_point_index_2d_f(&(rz[2*i]),
-				      afmm_tree_r_min(tree),
-				      afmm_tree_r_max(tree),
-				      afmm_tree_z_min(tree),
-				      afmm_tree_z_max(tree)) ;
-      fprintf(stderr, "%d:", i) ;
-      for ( j = 0 ; j <= afmm_tree_depth(tree) ; j ++ ) {
-	jdx = afmm_point_locate_box(idx, j) ;
-	fprintf(stderr, " %lu", jdx) ;
-      }
-      fprintf(stderr, "\n") ;
-    }
-    afmm_tree_local_field_eval_f(tree, 
-				     rz[2*i+0], rz[2*i+1],
-				     &(fld[i*ns*(2*N+4)]), 2*N+4) ;
-  }
+  /* for ( i = 0 ; i < nfld ; i ++ ) { */
+  /*   if ( trace_field ) { */
+  /*     guint64 idx, jdx ; */
+  /*     idx = afmm_point_index_2d_f(&(rz[2*i]), */
+  /* 				      afmm_tree_r_min(tree), */
+  /* 				      afmm_tree_r_max(tree), */
+  /* 				      afmm_tree_z_min(tree), */
+  /* 				      afmm_tree_z_max(tree)) ; */
+  /*     fprintf(stderr, "%d:", i) ; */
+  /*     for ( j = 0 ; j <= afmm_tree_depth(tree) ; j ++ ) { */
+  /* 	jdx = afmm_point_locate_box(idx, j) ; */
+  /* 	fprintf(stderr, " %lu", jdx) ; */
+  /*     } */
+  /*     fprintf(stderr, "\n") ; */
+  /*   } */
+  /*   afmm_tree_local_field_eval_f(tree,  */
+  /* 				     rz[2*i+0], rz[2*i+1], */
+  /* 				     &(fld[i*ns*(2*N+4)]), 2*N+4) ; */
+  /* } */
+
+  afmm_tree_field_eval_f(tree, fld, 2*N+4) ;
   
   fprintf(stderr, "%s: field evaluated; %lg\n",
 	  progname, g_timer_elapsed(timer, NULL)) ;

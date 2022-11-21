@@ -879,3 +879,80 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix_write)(gint n,
 
   return 0 ;
 }
+
+gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(gint N, gint L,
+						   AFMM_REAL *dG, gint nd,
+						   gint LS,
+						   gint LP,
+						   AFMM_REAL *S2Lfo,
+						   AFMM_REAL *S2Lfi,
+						   AFMM_REAL *S2Lbo,
+						   AFMM_REAL *S2Lbi)
+
+/*
+ * expansion to order LS on source side; LP on potential side;
+ * derivatives for shift operation available up to order L
+ *
+ */
+  
+{
+  gint i, j, k, ls, lp, m, offo, offi, idxs, idxp ;
+  gint ssgn, fsgn,  ns, np, str, n ;
+  AFMM_REAL sc, cft ;
+  
+  g_assert(LS + LP <= L) ;
+
+  /*matrix size*/
+  ns = afmm_derivative_offset_2(LS+1) ;
+  np = afmm_derivative_offset_2(LP+1) ;
+  n = N+1 ; str = ns*np ;
+  
+  /*loop on source coefficient indices*/
+  for ( ls = 0 ; ls <= LS ; ls ++ ) {
+    ssgn = 1 ;
+    for ( k = 0 ; k <= ls ; k ++ ) {
+      j = ls - k ;
+      idxs = afmm_derivative_index_ij(j,k) ;
+      /*loop on potential coefficient indices*/
+      for ( lp = 0 ; lp <= LP ; lp ++ ) {
+	fsgn = 1 ;
+	for ( m = 0 ; m <= lp ; m ++ ) {
+	  i = lp - m ;
+	  idxp = afmm_derivative_index_ij(i, m) ;
+	  offo = afmm_derivative_offset(ls+lp) +
+	    afmm_derivative_index_ijk(i, j, k+m) ;
+	  offi = afmm_derivative_offset(ls+lp) +
+	    afmm_derivative_index_ijk(j, i, k+m) ;
+	  cft = afmm_binomial(k+m,k) ;
+#ifdef AFMM_SINGLE_PRECISION
+	  sc = ssgn*cft ;
+	  blaswrap_saxpy(n, sc, &(dG[offo]), nd,
+			 &(S2Lfo[idxp*ns + idxs]), str) ;
+	  blaswrap_saxpy(n, sc, &(dG[offi]), nd,
+			 &(S2Lfi[idxp*ns + idxs]), str) ;
+	  sc = fsgn*cft ;
+	  blaswrap_saxpy(n, sc, &(dG[offo]), nd,
+			 &(S2Lbo[idxp*ns + idxs]), str) ;
+	  blaswrap_saxpy(n, sc, &(dG[offi]), nd,
+			 &(S2Lbi[idxp*ns + idxs]), str) ;
+#else  /*AFMM_SINGLE_PRECISION*/
+	  sc = ssgn*cft ;
+	  blaswrap_daxpy(n, sc, &(dG[offo]), nd,
+			 &(S2Lfo[idxp*ns + idxs]), str) ;
+	  blaswrap_daxpy(n, sc, &(dG[offi]), nd,
+			 &(S2Lfi[idxp*ns + idxs]), str) ;
+	  sc = fsgn*cft ;
+	  blaswrap_daxpy(n, sc, &(dG[offo]), nd,
+			 &(S2Lbo[idxp*ns + idxs]), str) ;
+	  blaswrap_daxpy(n, sc, &(dG[offi]), nd,
+			 &(S2Lbi[idxp*ns + idxs]), str) ;
+#endif  /*AFMM_SINGLE_PRECISION*/
+	  fsgn *= -1 ;
+	}
+      }
+      ssgn *= -1 ;
+    }
+  }
+  
+  return 0 ;
+}

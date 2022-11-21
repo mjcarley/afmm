@@ -65,16 +65,18 @@ extern const gdouble AFMM_N_SQUARED[] ;
 
 #endif /*AFMM_SINGLE_PRECISION*/
 
-extern const gint AFMM_BINOMIALS[] ;
-/* #define afmm_binomial(_m,_k) (AFMM_BINOMIALS[(_m)*((_m)+1)/2+(_k)]) */
+extern const gdouble AFMM_BINOMIALS[] ;
+#define afmm_binomial(_m,_k) (AFMM_BINOMIALS[(_m)*((_m)+1)/2+(_k)])
 
-#define afmm_binomial(_m,_k)					\
-  (exp(lgamma((_m)+1) - lgamma((_k)+1) - lgamma((_m)-(_k)+1)))
+/* #define afmm_binomial(_m,_k)					\ */
+/*   (exp(lgamma((_m)+1) - lgamma((_k)+1) - lgamma((_m)-(_k)+1))) */
 
 /* gdouble afmm_binomial(guint n, guint k) ; */
 
 #define afmm_tree_point_index(_t,_i)			\
   ((AFMM_REAL *)(&((_t)->points[(_i)*((_t)->pstr)])))
+#define afmm_tree_field_index(_t,_i)			\
+  ((AFMM_REAL *)(&((_t)->field[(_i)*((_t)->fstr)])))
 
 extern const guint afmm_ilist_di[], afmm_ilist_dj[] ;
 

@@ -32,7 +32,10 @@ typedef enum {
 typedef struct _afmm_box_t afmm_box_t ;
 struct _afmm_box_t {
   guint32 i, /**< index of first source point in box */
-    n ;      /**< number of source points in box */
+    n,       /**< number of source points in box */
+    ip,      /**< index of first field (potential) point in box */
+    np       /**< number of field points in box */
+    ;      
   gpointer Cs, Cf ; /*coefficients of source and field expansions*/
 } ;
 
@@ -44,20 +47,26 @@ struct  _afmm_tree_t {
   N,
     maxpoints,
     npoints,
+    maxfield,
+    nfield,
     *ip,
+    *ifld,
     ns,
     depth,
     order_s[AFMM_TREE_MAX_DEPTH+1],
     order_f[AFMM_TREE_MAX_DEPTH+1] ;
-  gchar *points ;
+  gchar *points, *field ;
   gpointer Cs[AFMM_TREE_MAX_DEPTH+1], Cf[AFMM_TREE_MAX_DEPTH+1], S ; 
   gsize
   size,
-    pstr ;
+    pstr,
+    fstr ;
 } ;
 
 #define afmm_tree_point_number_max(_t) ((_t)->maxpoints)
 #define afmm_tree_point_number(_t)     ((_t)->npoints)
+#define afmm_tree_field_number_max(_t) ((_t)->maxfield)
+#define afmm_tree_field_number(_t)     ((_t)->nfield)
 #define afmm_tree_mode_number(_t)      ((_t)->N)
 #define afmm_tree_source_size(_t)      ((_t)->ns)
 #define afmm_tree_r_min(_t)            ((_t)->rmin)
@@ -168,6 +177,14 @@ gint afmm_laplace_shift_s2l_f(gint N, gfloat *S2L,
 			      gfloat *S, gint sdist, gint LS,
 			      gint ns,
 			      gfloat *P, gint pdist, gint LP) ;
+gint afmm_laplace_s2l_matrices(gint N, gint L, gdouble *dG, gint nd,
+			       gint LS, gint LP,
+			       gdouble *S2Lfo, gdouble *S2Lfi,
+			       gdouble *S2Lbo, gdouble *S2Lbi) ;
+gint afmm_laplace_s2l_matrices_f(gint N, gint L, gfloat *dG, gint nd,
+				 gint LS, gint LP,
+				 gfloat *S2Lfo, gfloat *S2Lfi,
+				 gfloat *S2Lbo, gfloat *S2Lbi) ;
 gint afmm_laplace_s2l_matrix_write(gint n, gdouble *S2L, gint LS, gint LP,
 				   FILE *f) ;
 gint afmm_laplace_s2l_matrix_write_f(gint n, gfloat *S2L, gint LS, gint LP,
@@ -230,10 +247,10 @@ gint afmm_expansion_shift_f(gint N,
 
 afmm_tree_t *afmm_tree_new(gdouble rmin, gdouble rmax,
 			   gdouble zmin, gdouble zmax,
-			   guint maxpoints) ;
+			   guint maxpoints, guint maxfield) ;
 afmm_tree_t *afmm_tree_new_f(gfloat rmin, gfloat rmax,
 			     gfloat zmin, gfloat zmax,
-			     guint maxpoints) ;
+			     guint maxpoints, guint maxfield) ;
 guint64 afmm_point_index_2d(gdouble *rz,
 			    gdouble rmin, gdouble rmax,
 			    gdouble zmin, gdouble zmax) ;
@@ -246,6 +263,14 @@ gint afmm_tree_add_points(afmm_tree_t *t,
 gint afmm_tree_add_points_f(afmm_tree_t *t,
 			    gpointer pts, gsize pstr,
 			    guint npts, gboolean sorted) ;
+gint afmm_tree_add_field(afmm_tree_t *t,
+			 gpointer pts, gsize pstr,
+			 guint npts, gboolean sorted) ;
+gint afmm_tree_add_field_f(afmm_tree_t *t,
+			   gpointer pts, gsize pstr,
+			   guint npts, gboolean sorted) ;
+gint afmm_tree_field_eval(afmm_tree_t *t, gdouble *f, gint fstr) ;
+gint afmm_tree_field_eval_f(afmm_tree_t *t, gfloat *f, gint fstr) ;
 gint afmm_tree_add_level(afmm_tree_t *t) ;
 gint afmm_tree_refine(afmm_tree_t *t) ;
 gint afmm_tree_refine_f(afmm_tree_t *t) ;
