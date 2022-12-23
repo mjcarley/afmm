@@ -12,6 +12,7 @@
 
 ## don't include intermediate data files
 *.dat
+*.ip
 
 ## scratch directory
 scratch
