@@ -12,7 +12,7 @@ usual autotools configure process
 
 ./configure (options)
 
-It is very strongly recommended to compile wbfmm with the highest
+It is very strongly recommended to compile afmm with the highest
 level (-O3) of optimization. It makes a very big difference to the
 performance, even compared to using the -O2 flag. You can do this with
 

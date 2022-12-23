@@ -44,7 +44,9 @@ struct  _afmm_tree_t {
   gdouble rmin, rmax, zmin, zmax, esep ;
   afmm_box_t *boxes[1 << (AFMM_TREE_MAX_DEPTH+1)] ;
   guint
-  N,
+  L,
+    ngd,
+    N,
     maxpoints,
     npoints,
     maxfield,
@@ -53,14 +55,17 @@ struct  _afmm_tree_t {
     *ifld,
     ns,
     depth,
+    sdist, sstr,
     order_s[AFMM_TREE_MAX_DEPTH+1],
     order_f[AFMM_TREE_MAX_DEPTH+1] ;
-  gchar *points, *field ;
+  gchar *points, *field, *G ;
   gpointer Cs[AFMM_TREE_MAX_DEPTH+1], Cf[AFMM_TREE_MAX_DEPTH+1], S ; 
   gsize
   size,
     pstr,
     fstr ;
+  gboolean
+  sources_sorted ; 
 } ;
 
 #define afmm_tree_point_number_max(_t) ((_t)->maxpoints)
@@ -81,7 +86,16 @@ struct  _afmm_tree_t {
 #define afmm_tree_source_order(_t,_l)  ((_t)->order_s[(_l)])
 #define afmm_tree_field_order(_t,_l)   ((_t)->order_f[(_l)])
 #define afmm_tree_source_data(_t)      ((_t)->S)
+#define afmm_tree_source_dist(_t)      ((_t)->sdist)
+#define afmm_tree_source_stride(_t)    ((_t)->sstr)
 #define afmm_tree_box_separation(_t)   ((_t)->esep)
+#define afmm_tree_box_centre_r(_t,_i,_d)		\
+  (afmm_tree_r_min((_t)) +			\
+   afmm_tree_delta_r((_t))*((_i)+0.5)/(1 << (_d)))
+#define afmm_tree_box_centre_z(_t,_i,_d)		\
+  (afmm_tree_z_min((_t)) +			\
+   afmm_tree_delta_z((_t))*((_i)+0.5)/(1 << (_d)))
+#define afmm_tree_sources_sorted(_t)    ((_t)->sources_sorted)
 /* #define afmm_tree_ */
 
 #define afmm_derivative_offset(_q) ((_q)*((_q)+1)*((_q)+2)/6)
@@ -94,6 +108,18 @@ struct  _afmm_tree_t {
 
 gint afmm_elliptic_KE(gdouble k, gdouble *K, gdouble *E) ;
 gint afmm_elliptic_KE_f(gfloat k, gfloat *K, gfloat *E) ;
+gint afmm_legendre_nm12(gdouble x, gint N,
+			 gdouble *P, gint pstr,
+			 gdouble *Q, gint qstr) ;
+gint afmm_legendre_nm12_f(gfloat x, gint N,
+			  gfloat *P, gint pstr,
+			  gfloat *Q, gint qstr) ;
+gint afmm_legendre_Q(gint N, gint M, gdouble chi, gdouble *Q, gint ldq) ;
+gint afmm_legendre_Q_f(gint N, gint M, gfloat chi, gfloat *Q, gint ldq) ;
+gint afmm_legendre_Q_rec(gint N, gdouble chi, gdouble *Q, gint ldq) ;
+gint afmm_legendre_Q_rec_f(gint N, gfloat chi, gfloat *Q, gint ldq) ;
+gdouble afmm_hyperg_2F1(gdouble a, gdouble b, gdouble c, gdouble x) ;
+gfloat afmm_hyperg_2F1_f(gfloat a, gfloat b, gfloat c, gfloat x) ;
 
 gint afmm_laplace_gfunc(gint N,
 			gdouble r, gdouble r1, gdouble z,
@@ -101,6 +127,20 @@ gint afmm_laplace_gfunc(gint N,
 gint afmm_laplace_gfunc_f(gint N,
 			  gfloat r, gfloat r1, gfloat z,
 			  gfloat *G, gint str) ;
+gint afmm_laplace_gfunc_vec(gint N,
+			    gdouble *r, gint rstr,
+			    gdouble *z, gint zstr,
+			    gdouble *r1, gint r1str,
+			    gdouble *z1, gint z1str,
+			    gint ng,
+			    gdouble *G, gint sdist) ;
+gint afmm_laplace_gfunc_vec_f(gint N,
+			      gfloat *r, gint rstr,
+			      gfloat *z, gint zstr,
+			      gfloat *r1, gint r1str,
+			      gfloat *z1, gint z1str,
+			      gint ng,
+			      gfloat *G, gint sdist) ;
 
 gint afmm_laplace_gfunc_derivatives(gint N, gint L,
 				    gdouble r, gdouble r1, gdouble z,
@@ -131,6 +171,24 @@ gint afmm_laplace_field_direct_f(gfloat *rzsrc, gfloat *src, gint sstr,
 				 gint nfld,
 				 gboolean zero,
 				 gfloat *work) ;
+gint afmm_laplace_field_direct_vec(gdouble *rzsrc, gint rzstr,
+				   gdouble *src, gint sdist, gint sstr,
+				   gint ns, gint nsrc,
+				   gint N,
+				   gdouble *rzfld, gdouble *fld,
+				   gint fdist, gint nfld,
+				   gboolean zero,
+				   gint inc,
+				   gdouble *work) ;
+gint afmm_laplace_field_direct_vec_f(gfloat *rzsrc, gint rzstr,
+				     gfloat *src, gint sdist, gint sstr,
+				     gint ns, gint nsrc,
+				     gint N,
+				     gfloat *rzfld, gfloat *fld,
+				     gint fdist, gint nfld,
+				     gboolean zero,
+				     gint inc,
+				     gfloat *work) ;
 
 gint afmm_laplace_gfunc_comp(gint N,
 			     gdouble r, gdouble r1, gdouble z,
@@ -178,11 +236,11 @@ gint afmm_laplace_shift_s2l_f(gint N, gfloat *S2L,
 			      gint ns,
 			      gfloat *P, gint pdist, gint LP) ;
 gint afmm_laplace_s2l_matrices(gint N, gint L, gdouble *dG, gint nd,
-			       gint LS, gint LP,
+			       gint LS, gint LP, gdouble del,
 			       gdouble *S2Lfo, gdouble *S2Lfi,
 			       gdouble *S2Lbo, gdouble *S2Lbi) ;
 gint afmm_laplace_s2l_matrices_f(gint N, gint L, gfloat *dG, gint nd,
-				 gint LS, gint LP,
+				 gint LS, gint LP, gfloat del,
 				 gfloat *S2Lfo, gfloat *S2Lfi,
 				 gfloat *S2Lbo, gfloat *S2Lbi) ;
 gint afmm_laplace_s2l_matrix_write(gint n, gdouble *S2L, gint LS, gint LP,
@@ -213,9 +271,6 @@ fftwf_plan afmm_laplace_modes_to_field_plan_f(gfloat *modes, gint ns, gint np,
 gdouble afmm_hypergeometric_2F1(gdouble a, gdouble b, gdouble c, gdouble z) ;
 gfloat afmm_hypergeometric_2F1_f(gfloat a, gfloat b, gfloat c, gfloat z) ;
 
-gint afmm_legendre_Q(gint N, gint M, gdouble chi, gdouble *Q, gint ldq) ;
-gint afmm_legendre_Q_f(gint N, gint M, gfloat chi, gfloat *Q, gint ldq) ;
-
 gint afmm_source_moments(gdouble r1, gdouble z1,
 			 gdouble *C, gint N, gint L, gdouble *S, gint sdist) ;
 gint afmm_source_moments_f(gfloat r1, gfloat z1,
@@ -245,22 +300,33 @@ gint afmm_expansion_shift_f(gint N,
 			    gint Mo,
 			    gfloat *Po, gint odist) ;
 
+gint afmm_sort_point_list(gdouble *pts, gint psize, gint npts,
+			  gdouble rmin, gdouble rmax,
+			  gdouble zmin, gdouble zmax) ;
+gint afmm_sort_point_list_f(gfloat *pts, gint psize, gint npts,
+			    gfloat rmin, gfloat rmax,
+			    gfloat zmin, gfloat zmax) ;
+
+
 afmm_tree_t *afmm_tree_new(gdouble rmin, gdouble rmax,
 			   gdouble zmin, gdouble zmax,
 			   guint maxpoints, guint maxfield) ;
 afmm_tree_t *afmm_tree_new_f(gfloat rmin, gfloat rmax,
 			     gfloat zmin, gfloat zmax,
 			     guint maxpoints, guint maxfield) ;
+gint afmm_tree_init_s2l(afmm_tree_t *t, guint d, guint L) ;
+gint afmm_tree_init_s2l_f(afmm_tree_t *t, guint d, guint L) ;
+
 guint64 afmm_point_index_2d(gdouble *rz,
 			    gdouble rmin, gdouble rmax,
 			    gdouble zmin, gdouble zmax) ;
 guint64 afmm_point_index_2d_f(gfloat *rz,
 			      gfloat rmin, gfloat rmax,
 			      gfloat zmin, gfloat zmax) ;
-gint afmm_tree_add_points(afmm_tree_t *t,
+gint afmm_tree_add_sources(afmm_tree_t *t,
 			  gpointer pts, gsize pstr,
 			  guint npts, gboolean sorted) ;
-gint afmm_tree_add_points_f(afmm_tree_t *t,
+gint afmm_tree_add_sources_f(afmm_tree_t *t,
 			    gpointer pts, gsize pstr,
 			    guint npts, gboolean sorted) ;
 gint afmm_tree_add_field(afmm_tree_t *t,
@@ -280,6 +346,10 @@ gboolean afmm_boxes_separated(guint i, guint j, gdouble etol) ;
 gboolean afmm_grid_boxes_separated(guint ir, guint iz,
 				   guint jr, guint jz,
 				   gdouble etol) ;
+gboolean afmm_grid_boxes_touch(guint ir, guint iz, guint jr, guint jz) ;
+gboolean afmm_grid_box_point_separated(afmm_tree_t *t,
+				       gdouble r, gdouble z,
+				       guint i, guint j, guint d) ;
 gint afmm_trace_interactions(afmm_tree_t *t, guint r_trace, FILE *f) ;
 gint afmm_tree_interaction_list(afmm_tree_t *t, guint d, guint i, guint j,
 				guint *ilist, gint *ni) ;
@@ -287,7 +357,8 @@ gint afmm_write_interaction_list(afmm_tree_t *t, guint d,
 				 guint ir, guint iz,
 				 FILE *f) ;
 gint afmm_radius_interaction_list(guint d, guint i0, gdouble etol,
-				  guint *ilist, gint *ni, gint nimax) ;
+				  guint *ilist, gint *ni, gint nimax,
+				  gboolean s2l) ;
 gint afmm_write_radius_interaction_list(guint d, guint i, gdouble etol,
 					FILE *f) ;
 
@@ -311,10 +382,10 @@ gint afmm_tree_coefficient_init(afmm_tree_t *t, guint l,
 gint afmm_tree_coefficient_init_f(afmm_tree_t *t, guint l,
 				  guint nf, guint ns) ;
 gint afmm_tree_leaf_expansions(afmm_tree_t *t,
-			       gdouble *C, gint cdist,
+			       gdouble *C, gint cdist, gint cstr,
 			       gboolean zero_expansions) ;
 gint afmm_tree_leaf_expansions_f(afmm_tree_t *t,
-				 gfloat *C, gint cdist,
+				 gfloat *C, gint cdist, gint cstr,
 				 gboolean zero_expansions) ;
 gint afmm_tree_expansion_eval_field(afmm_tree_t *t, guint d,
 				    gdouble r, gdouble z,
@@ -327,13 +398,21 @@ gint afmm_tree_local_field_eval(afmm_tree_t *t, gdouble r, gdouble z,
 gint afmm_tree_local_field_eval_f(afmm_tree_t *t, gfloat r, gfloat z,
 				  gfloat *f, gint fdist) ;
 gint afmm_box_field_direct(afmm_tree_t *t, afmm_box_t *b,
-			   gdouble *src, gint sdist, gint ns, gint N,
 			   gdouble *rz, gdouble *f, gint fdist,
 			   gboolean zero, gdouble *work) ;
 gint afmm_box_field_direct_f(afmm_tree_t *t, afmm_box_t *b,
-			     gfloat *src, gint sdist, gint ns, gint N,
 			     gfloat *rz, gfloat *f, gint fdist,
 			     gboolean zero, gfloat *work) ;
+gint afmm_box_field_indirect(afmm_tree_t *t, guint64 i, guint level,
+			     gdouble *rz,
+			     gdouble *f, gint fdist,
+			     gboolean zero,
+			     gdouble *work) ;
+gint afmm_box_field_indirect_f(afmm_tree_t *t, guint64 i, guint level,
+			       gfloat *rz,
+			       gfloat *f, gint fdist,
+			       gboolean zero,
+			       gfloat *work) ;
   
 gint afmm_interaction_list(guint64 b, guint depth, guint64 *ilist, gint *ni) ;
 gint afmm_upward_pass(afmm_tree_t *t, guint level, gdouble *work) ;

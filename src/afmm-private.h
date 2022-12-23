@@ -29,12 +29,14 @@
 #define CBRT(_x) cbrtf((_x))
 #define SIN(_x) sinf((_x))
 #define COS(_x) cosf((_x))
+#define SINH(_x) sinhf((_x))
 #define ACOS(_x) acosf((_x))
 #define ACOSH(_x) acoshf((_x))
 #define ATAN(_x) atanf((_x))
 #define ATAN2(_y,_x) atan2f((_y),(_x))
 #define LOG(_x) logf((_x))
 #define EXP(_x) expf((_x))
+#define GAMMA(_x) tgammaf((_x))
 
 extern const gfloat AFMM_FACTORIALS_F[] ;
 #define afmm_factorial(_n) (AFMM_FACTORIALS_F[(_n)])
@@ -51,12 +53,14 @@ extern const gfloat AFMM_N_SQUARED_F[] ;
 #define CBRT(_x) cbrt((_x))
 #define SIN(_x) sin((_x))
 #define COS(_x) cos((_x))
+#define SINH(_x) sinh((_x))
 #define ACOS(_x) acos((_x))
 #define ACOSH(_x) acosh((_x))
 #define ATAN(_x) atan((_x))
 #define ATAN2(_y,_x) atan2((_y),(_x))
 #define LOG(_x) log((_x))
 #define EXP(_x) exp((_x))
+#define GAMMA(_x) tgamma((_x))
 
 extern const gdouble AFMM_FACTORIALS[] ;
 #define afmm_factorial(_n) (AFMM_FACTORIALS[(_n)])
@@ -79,5 +83,10 @@ extern const gdouble AFMM_BINOMIALS[] ;
   ((AFMM_REAL *)(&((_t)->field[(_i)*((_t)->fstr)])))
 
 extern const guint afmm_ilist_di[], afmm_ilist_dj[] ;
+
+extern const gint _s2l_matrix_index[] ;
+
+#define afmm_tree_s2l_index(_i,_j) (_s2l_matrix_index[(_i)*4+(_j)])
+#define afmm_tree_s2l_derivative_number(_t) ((_t)->ngd)
 
 #endif /*AFMM_PRIVATE_H_INCLUDED*/

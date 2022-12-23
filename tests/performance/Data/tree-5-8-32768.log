@@ -1,0 +1,13 @@
+afmm-tree-calc: 32768 field points
+afmm-tree-calc: 32768 source points
+afmm-tree-calc: modal order 16
+afmm-tree-calc: 1 source components; 0.462761
+afmm-tree-calc: maximum order 32
+afmm-tree-calc: workspace size: 1713192
+afmm-tree-calc: initializing leaf expansions; 0.627302
+afmm-tree-calc: leaf expansions initialized; 0.685346
+afmm-tree-calc: upward pass; 0.685368
+afmm-tree-calc: upward pass completed; 0.76739
+afmm-tree-calc: downward pass; 0.767409
+afmm-tree-calc: downward pass completed; 3.25664
+afmm-tree-calc: field evaluated; 6.71947

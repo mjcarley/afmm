@@ -32,44 +32,82 @@
 #include "afmm-private.h"
 
 gint AFMM_FUNCTION_NAME(afmm_laplace_gfunc)(gint N,
-					    AFMM_REAL r,
-					    AFMM_REAL r1,
+					    AFMM_REAL ri,
+					    AFMM_REAL r1i,
 					    AFMM_REAL z,
 					    AFMM_REAL *G, gint str)
 
 {
   /*
-   * generate modal Green's functions and derivatives
+   * generate modal Green's functions
    *
    * Cohl and Tohline, THE ASTROPHYSICAL JOURNAL, 527:86--101, 1999
    * December 10
    *
    */
-  AFMM_REAL chi, sc, Gn, Gnm1, mu, K, E ;
+  AFMM_REAL chi, sc, Gn, Gnm1, mu, K, E, r, r1 ;
   gint n, dN ;
+  /* AFMM_REAL tol ; */
 
+  /* tol = 1e-6 ; */
+
+  r = MAX(ri, r1i) ; r1 = MIN(ri, r1i) ;
+  
   if ( r == 0 ) {
     for ( n = 1 ; n <= N ; n ++ ) G[n*str] = 0.0 ;
     G[0] = 0.5/SQRT(r1*r1+z*z) ;
     return 0 ;
   }
+
+  if ( r1 == 0 ) {
+    for ( n = 1 ; n <= N ; n ++ ) G[n*str] = 0.0 ;
+    G[0] = 0.5/SQRT(r*r+z*z) ;
+    return 0 ;
+  }
+  
+  chi = 0.5*(r*r + r1*r1 + z*z)/r1/r ;
+
+  if ( chi > 1e4 ) {
+    sc = 0.5/M_PI/SQRT(r*r1) ;
+    for ( n = 0 ; n <= N ; n ++ ) {
+      G[n*str] = sc*SQRT(M_PI)*GAMMA(0.5+n)/GAMMA(1.0+n)/pow(2.0*chi,n+0.5)*
+	AFMM_FUNCTION_NAME(afmm_hypergeometric_2F1)(0.25*(2*n+3),
+						    0.25*(2*n+1),
+						    1.0+n,
+						    1.0/chi/chi) ;
+    }
+    
+    return 0 ;
+  }
+  /* AFMM_REAL work[1024] ; */
+  /* AFMM_FUNCTION_NAME(afmm_legendre_nm12)(chi, N, work, 1, G, str) ; */
+
+  AFMM_FUNCTION_NAME(afmm_legendre_Q_rec)(N, chi, G, str) ;
+  
+  sc = 2.0*M_PI*SQRT(r*r1) ;
+  for ( n = 0 ; n <= N ; n ++ ) {
+    G[n*str] /= sc ;
+  }
+  
+  return 0 ;
   
   dN = 32 ;
-  chi = 0.5*(r*r + r1*r1 + z*z)/r1/r ;
-  /* if ( chi < 1.01 ) { */
-  /*   g_error("%s: possible divergence r=%lg; r1=%lg; z=%lg; chi=%lg", */
-  /* 	    __FUNCTION__, r, r1, z, chi) ; */
-  /* } */
 
+  /* if ( ABS(chi - 1.0) < 1e-9 ) { */
+  /*   for ( n = 0 ; n <= N ; n ++ ) G[n*str] = 0.0 ; */
+  /*   return 0 ; */
+  /* } */
+  
   /*descending recursion to seed the recursion for the array*/
   Gn = 1.0 ; Gnm1 = 1.0 ;
+  Gn = Gnm1 = 1e-9 ;
   for ( n = N + dN ; n >= N+1 ; n -- ) {
     sc = Gnm1 ;
     Gnm1 = (4.0*(n-1)*chi*Gnm1 - (2.0*n-1)*Gn)/(2.0*n-3) ;
     Gn = sc ;
   }
   G[N*str] = 1.0 ; G[(N-1)*str] = Gnm1/Gn ;
-  /* G[ N   *str] *= 1e-6 ; G[(N-1)*str] *= 1e-6 ; */
+  G[ N   *str] *= 1e-6 ; G[(N-1)*str] *= 1e-6 ;
   for ( n = N ; n >= 2 ; n -- ) {
     G[(n-2)*str] = (4.0*(n-1)*chi*G[(n-1)*str] - (2.0*n-1)*G[n*str])/(2.0*n-3) ;
   }
@@ -80,9 +118,144 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_gfunc)(gint N,
   sc = mu*K*0.5*M_1_PI/SQRT(r*r1)/G[0] ;
 
   /*scale Green's functions*/
-  for ( n = 0 ; n <= N ; n ++ ) G[n*str] *= sc ;
+  /* for ( n = 0 ; n <= N ; n ++ ) G[n*str] *= sc ; */
+  for ( n = 0 ; n <= N ; n ++ ) {
+    G[n*str] *= sc ;
+    if ( isnan(G[n*str]) || isinf(G[n*str]) ) {
+      g_error("%s: numerical catastrophe n = %d, str = %d, G = %lg",
+	      __FUNCTION__, n, str, G[n*str]) ;
+    }
+    g_assert(!isnan(G[n*str]) && !isinf(G[n*str])) ;
+  }
 
+  /*internal check on G_{1}*/
+  /* sc = chi*mu*K - (1.0+chi)*mu*E ; */
+  /* sc *= 0.5*M_1_PI/SQRT(r*r1) ; */
+
+  /* if ( ABS(sc - G[1*str]) > 1e-9 ) { */
+  /*   g_error("%s: recursion failure on G_1=%lg, should be %lg, " */
+  /* 	    "difference = %lg", */
+  /* 	    __FUNCTION__, sc, G[1*str], ABS(sc-G[1*str])) ; */
+  /* } */
+
+  /* G[1*str] = sc ; */
+
+  /* n = 2 ; */
+  /* fprintf(stderr, "%1.16e %1.16e %1.16e %1.16e\n", */
+  /* 	  r, r1, z, chi) ; */
+  /* fprintf(stderr, "%d: %1.16e %1.16e\n", */
+  /* 	  n, chi, G[n*str]*2.0*M_PI*SQRT(r*r1)) ; */
+  /* exit(1) ; */
+  
+  /* g_assert(ABS(sc - G[1*str]) < 1e-12) ; */
+  
+  /* for ( n = 0 ; n <= N ; n ++ ) { */
+  /*   if ( G[n*str] < tol ) return n ; */
+  /* } */
+
+  return N ;
+}
+
+gint AFMM_FUNCTION_NAME(afmm_laplace_gfunc_vec)(gint N,
+						AFMM_REAL *r, gint rstr,
+						AFMM_REAL *z, gint zstr,
+						AFMM_REAL *r1, gint r1str,
+						AFMM_REAL *z1, gint z1str,
+						gint ng,
+						AFMM_REAL *G, gint sdist)
+
+{
+  /*
+   * generate modal Green's functions and derivatives
+   *
+   * Cohl and Tohline, THE ASTROPHYSICAL JOURNAL, 527:86--101, 1999
+   * December 10
+   *
+   */
+  AFMM_REAL chi[32], sc, Gn[32], Gnm1[32], mu, K, E, x ;
+  gint n, i, dN ;
+
+  g_assert(ng < 33) ;
+  g_assert(sdist >= ng) ;
+
+  /* if ( r == 0 ) { */
+  /*   for ( n = 1 ; n <= N ; n ++ ) G[n*str] = 0.0 ; */
+  /*   G[0] = 0.5/SQRT(r1*r1+z*z) ; */
+  /*   return 0 ; */
+  /* } */
+
+  for ( i = 0 ; i < ng ; i ++ ) {
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc)(N,
+					   r[i*rstr],  r1[i*r1str],
+					   z[i*zstr] - z1[i*z1str],
+					   &(G[i]), sdist) ;
+  }
+  
   return 0 ;
+  
+  dN = 64 ;
+  for ( i = 0 ; i < ng ; i ++ ) {
+    x = z[i*zstr] - z1[i*z1str] ;
+    chi[i] = 0.5*(r [i* rstr]*r[i *rstr ] +
+		  r1[i*r1str]*r1[i*r1str] +
+		  x*x)/r1[i*r1str]/r[i*rstr] ;
+  }
+  /*descending recursion to seed the recursion for the array*/
+  for ( i = 0 ; i < ng ; i ++ ) {
+    Gn[i] = Gnm1[i] = 1.0 ;
+  }
+  for ( n = N + dN ; n >= N+1 ; n -- ) {
+    for ( i = 0 ; i < ng ; i ++ ) {
+      sc = Gnm1[i] ;
+      Gnm1[i] = (4.0*(n-1)*chi[i]*Gnm1[i] - (2.0*n-1)*Gn[i])/(2.0*n-3) ;
+      Gn[i] = sc ;
+    }
+  }
+  for ( i = 0 ; i < ng ; i ++ ) {
+    G[N*sdist+i] = 1.0 ; G[(N-1)*sdist+i] = Gnm1[i]/Gn[i] ;
+  }
+    /* G[ N   *str] *= 1e-6 ; G[(N-1)*str] *= 1e-6 ; */
+  for ( n = N ; n >= 2 ; n -- ) {
+    for ( i = 0 ; i < ng ; i ++ ) {
+      G[(n-2)*sdist+i] =
+	(4.0*(n-1)*chi[i]*G[(n-1)*sdist+i] -
+	 (2.0*n-1)*G[n*sdist+i])/(2.0*n-3) ;
+    }
+  }
+
+  /*value for G[0] from elliptic integral*/
+  for ( i = 0 ; i < ng ; i ++ ) {
+    mu = SQRT(2.0/(1.0+chi[i])) ;
+    AFMM_FUNCTION_NAME(afmm_elliptic_KE)(mu, &K, &E) ;
+    sc = mu*K*0.5*M_1_PI/SQRT(r[i*rstr]*r1[i*r1str])/G[0*sdist+i] ;
+    /*scale Green's functions*/
+    for ( n = 0 ; n <= N ; n ++ ) G[n*sdist+i] *= sc ;
+
+    /* internal check on G_{1} */
+    /* sc = chi[i]*mu*K - (1.0+chi[i])*mu*E ; */
+    /* sc *= 0.5*M_1_PI/SQRT(r[i*rstr]*r1[i*r1str]) ; */
+    
+    /* if ( ABS(sc - G[1*sdist+i]) > 1e-9 ) { */
+    /*   g_error("%s: recursion failure on G_1=%lg, should be %lg, " */
+    /* 	      "difference = %lg", */
+    /* 	      __FUNCTION__, sc, G[1*sdist+i], ABS(sc-G[1*sdist+i])) ; */
+    /* } */    
+  }
+
+  /* /\* for ( n = 0 ; n <= N ; n ++ ) { *\/ */
+  /* /\*   if ( G[n*str] < tol ) return n ; *\/ */
+  /* /\* } *\/ */
+
+  for ( i = 0 ; i < ng ; i ++ ) {
+    if ( chi[i] > 1e7 ) {
+      for ( n = 1 ; n <= N ; n ++ ) {
+	G[n*sdist + i] = 0.0 ;
+	G[i] = 0.5/SQRT(2.0*chi[i])/SQRT(r[i*rstr]*r1[i*r1str]) ;
+      }
+    }
+  }
+  
+  return N ;
 }
 
 gint AFMM_FUNCTION_NAME(afmm_laplace_gfunc_comp)(gint N,
@@ -526,10 +699,8 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_field_direct)(AFMM_REAL *rzsrc,
  */
   
 {
-  gint i, j, k, n ;
+  gint i, j, k, n, ng ;
   AFMM_REAL *G ;
-
-  /* fprintf(stderr, "%s\n", __FUNCTION__) ; */
   
   if ( zero ) {
     memset(fld, 0, ns*fdist*nfld*sizeof(AFMM_REAL)) ;
@@ -541,12 +712,12 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_field_direct)(AFMM_REAL *rzsrc,
   G = work ;
   for ( j = 0 ; j < nfld ; j ++ ) {
     for ( i = 0 ; i < nsrc ; i ++ ) {
-      AFMM_FUNCTION_NAME(afmm_laplace_gfunc)(N,
- 					     rzfld[2*j+0],  rzsrc[2*i+0],
-					     rzfld[2*j+1] - rzsrc[2*i+1],
-					     G, 1) ;
-      for ( k = 0 ; k < ns ; k ++ ) {
-	for ( n = 0 ; n <= N ; n ++ ) {
+      ng = AFMM_FUNCTION_NAME(afmm_laplace_gfunc)(N,
+						  rzfld[2*j+0],  rzsrc[2*i+0],
+						  rzfld[2*j+1] - rzsrc[2*i+1],
+						  G, 1) ;
+      for ( n = 0 ; n <= ng ; n ++ ) {
+	for ( k = 0 ; k < ns ; k ++ ) {
 	  fld[j*ns*fdist + k*fdist + 2*n+0] +=
 	    G[n]*src[i*ns*sdist + k*sdist + 2*n+0] ;
 	  fld[j*ns*fdist + k*fdist + 2*n+1] +=
@@ -555,6 +726,115 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_field_direct)(AFMM_REAL *rzsrc,
       }
     }
   }
+  
+  return 0 ;
+}
+
+gint AFMM_FUNCTION_NAME(afmm_laplace_field_direct_vec)(AFMM_REAL *rzsrc,
+						       gint rzstr,
+						       AFMM_REAL *src,
+						       gint sdist,
+						       gint sstr,
+						       gint ns,
+						       gint nsrc,
+						       gint N,
+						       AFMM_REAL *rzfld,
+						       AFMM_REAL *fld,
+						       gint fdist,
+						       gint nfld,
+						       gboolean zero,
+						       gint inc,
+						       AFMM_REAL *work)
+
+/*
+ * indexing: (real, imaginary part of) amplitude of mode n of source
+ * component j at point i is
+ * 
+ * src[i*sdist + j*sstr + 2*n+(0,1)]
+ *
+ * and similar for field
+ * 
+ * dist must be greater than or equal to 2*N+2 (and ideally 2*N+4 for
+ * fftw compatibility)
+ */
+  
+{
+  gint i, j, k, n ;
+  AFMM_REAL *G ;
+  
+  if ( zero ) {
+    memset(fld, 0, ns*fdist*nfld*sizeof(AFMM_REAL)) ;
+  }
+
+  g_assert(sdist >= 2*N+2) ;
+  g_assert(fdist >= 2*N+2) ;
+  g_assert(nfld == 1) ;
+  
+  G = work ;
+  /* for ( j = 0 ; j < nfld ; j ++ ) { */
+  j = 0 ;
+    for ( i = 0 ; i < inc*(nsrc/inc) ; i += inc ) {
+      AFMM_FUNCTION_NAME(afmm_laplace_gfunc_vec)(N,
+						 &(rzfld[2*j+0]), 0,
+						 &(rzfld[2*j+1]), 0,
+						 &(rzsrc[rzstr*i+0]), rzstr,
+						 &(rzsrc[rzstr*i+1]), rzstr,
+						 inc, G, inc) ;
+      for ( n = 0 ; n <= N ; n ++ ) {
+	for ( k = 0 ; k < ns ; k ++ ) {
+#ifdef AFMM_SINGLE_PRECISION
+	  g_assert_not_reached() ;
+#else /*AFMM_SINGLE_PRECISION*/
+	  gint i1 = 1 ;
+	  fld[j*ns*fdist + k*fdist + 2*n+0] +=
+	    blaswrap_ddot(inc, &(G[n*inc]), i1, &(src[i*sdist+k*sstr+2*n]),
+			  sdist) ;
+	  fld[j*ns*fdist + k*fdist + 2*n+1] +=
+	    blaswrap_ddot(inc, &(G[n*inc]), i1, &(src[i*sdist+k*sstr+2*n+1]),
+			  sdist) ;
+
+#endif /*AFMM_SINGLE_PRECISION*/
+	  
+	  /* for ( l = 0 ; l < inc ; l ++ ) { */
+	  /*   fld[j*ns*fdist + k*fdist + 2*n+0] += */
+	  /*     G[n*inc+l]*src[(i+l)*sdist + k*sstr + 2*n+0] ; */
+	  /*   fld[j*ns*fdist + k*fdist + 2*n+1] += */
+	  /*     G[n*inc+l]*src[(i+l)*sdist + k*sstr + 2*n+1] ; */
+	  /* } */
+	}
+      }
+    }
+    /*include the remaining sources*/
+    i = inc*(nsrc/inc) ; inc = nsrc - i ;
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_vec)(N,
+					       &(rzfld[2*j+0]), 0,
+					       &(rzfld[2*j+1]), 0,
+					       &(rzsrc[rzstr*i+0]), rzstr,
+					       &(rzsrc[rzstr*i+1]), rzstr,
+					       inc, G, inc) ;
+    for ( n = 0 ; n <= N ; n ++ ) {
+      for ( k = 0 ; k < ns ; k ++ ) {
+#ifdef AFMM_SINGLE_PRECISION
+	  g_assert_not_reached() ;
+#else /*AFMM_SINGLE_PRECISION*/
+	  gint i1 = 1 ;
+	  fld[j*ns*fdist + k*fdist + 2*n+0] +=
+	    blaswrap_ddot(inc, &(G[n*inc]), i1, &(src[i*sdist+k*sstr+2*n]),
+			  sdist) ;
+	  fld[j*ns*fdist + k*fdist + 2*n+1] +=
+	    blaswrap_ddot(inc, &(G[n*inc]), i1, &(src[i*sdist+k*sstr+2*n+1]),
+			  sdist) ;
+
+#endif /*AFMM_SINGLE_PRECISION*/
+	/* for ( l = 0 ; l < inc ; l ++ ) { */
+	/*   fld[j*ns*fdist + k*fdist + 2*n+0] += */
+	/*     G[n*inc+l]*src[(i+l)*sdist + k*sstr + 2*n+0] ; */
+	/*   fld[j*ns*fdist + k*fdist + 2*n+1] += */
+	/*     G[n*inc+l]*src[(i+l)*sdist + k*sstr + 2*n+1] ; */
+	/* } */
+      }
+    }
+  /* } */
   
   return 0 ;
 }
@@ -880,10 +1160,12 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix_write)(gint n,
   return 0 ;
 }
 
+
 gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(gint N, gint L,
 						   AFMM_REAL *dG, gint nd,
 						   gint LS,
 						   gint LP,
+						   AFMM_REAL del,
 						   AFMM_REAL *S2Lfo,
 						   AFMM_REAL *S2Lfi,
 						   AFMM_REAL *S2Lbo,
@@ -898,22 +1180,34 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(gint N, gint L,
 {
   gint i, j, k, ls, lp, m, offo, offi, idxs, idxp ;
   gint ssgn, fsgn,  ns, np, str, n ;
-  AFMM_REAL sc, cft ;
+  AFMM_REAL sc, cft, dls, dlp ;
   
   g_assert(LS + LP <= L) ;
 
+  /* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, L, dG, nd, LS, LP, */
+  /* 					      TRUE, TRUE, S2Lfo) ; */
+  /* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, L, dG, nd, LS, LP, */
+  /* 					      TRUE, FALSE, S2Lfi) ; */
+  /* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, L, dG, nd, LS, LP, */
+  /* 					      FALSE, TRUE, S2Lbo) ; */
+  /* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, L, dG, nd, LS, LP, */
+  /* 					      FALSE, FALSE, S2Lbi) ; */
+  /* return 0 ; */
+  
   /*matrix size*/
   ns = afmm_derivative_offset_2(LS+1) ;
   np = afmm_derivative_offset_2(LP+1) ;
   n = N+1 ; str = ns*np ;
   
   /*loop on source coefficient indices*/
+  dls = del ;
   for ( ls = 0 ; ls <= LS ; ls ++ ) {
     ssgn = 1 ;
     for ( k = 0 ; k <= ls ; k ++ ) {
       j = ls - k ;
       idxs = afmm_derivative_index_ij(j,k) ;
       /*loop on potential coefficient indices*/
+      dlp = 1.0 ;
       for ( lp = 0 ; lp <= LP ; lp ++ ) {
 	fsgn = 1 ;
 	for ( m = 0 ; m <= lp ; m ++ ) {
@@ -923,7 +1217,7 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(gint N, gint L,
 	    afmm_derivative_index_ijk(i, j, k+m) ;
 	  offi = afmm_derivative_offset(ls+lp) +
 	    afmm_derivative_index_ijk(j, i, k+m) ;
-	  cft = afmm_binomial(k+m,k) ;
+	  cft = afmm_binomial(k+m,k)/dls/dlp ;
 #ifdef AFMM_SINGLE_PRECISION
 	  sc = ssgn*cft ;
 	  blaswrap_saxpy(n, sc, &(dG[offo]), nd,
@@ -949,9 +1243,11 @@ gint AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(gint N, gint L,
 #endif  /*AFMM_SINGLE_PRECISION*/
 	  fsgn *= -1 ;
 	}
+	dlp *= del ;	
       }
       ssgn *= -1 ;
     }
+    dls *= del ;
   }
   
   return 0 ;

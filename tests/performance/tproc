@@ -1,0 +1,30 @@
+#!/bin/bash
+
+opfile=$3
+
+depth=$1
+order=$2
+
+dcty=Data
+
+rm -f ${opfile}
+
+NSRC='1024 2048 4096 8192 16384 24576 32768 40960 49152 57344 65536'
+NSRC='1024 2048 4096 8192 16384 32768 65536 131072'
+
+for nsrc in ${NSRC} ; do
+    tfile=${dcty}/tree-${depth}-${order}-${nsrc}.log
+    ##tfile=./tree-${depth}-${order}-${nsrc}.log
+    dfile=${dcty}/direct-${nsrc}.log
+
+    dt=`grep evaluated ${dfile} | cut -d \; -f 2`
+    ##ts=`grep "downward pass completed" ${tfile} | cut -d \; -f 2`
+    ts=`grep components ${tfile} | cut -d \; -f 2`    
+    te=`grep evaluated ${tfile} | cut -d \; -f 2`
+    ##echo ${dt}
+
+    tt=`echo ${te}-${ts} | bc -l`
+    
+    echo ${nsrc} ${depth} ${order} ${dt} ${tt} >> ${opfile}
+    
+done

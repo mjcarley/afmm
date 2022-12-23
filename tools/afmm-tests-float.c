@@ -44,6 +44,7 @@ gchar *_tests[] = {"elliptic",             /* 0*/
 		   "morton",               /*13*/
 		   "interactions",         /*14*/
 		   "s2l",                  /*15*/
+		   "vector",               /*16*/
 		   NULL} ;
 
 static gint parse_test(gchar *test)
@@ -166,7 +167,7 @@ static void greens_func_test(gfloat r, gfloat r1, gfloat z,
 			     gint N)
 
 {
-  gfloat G[1024], Gc[1024], err ;
+  gfloat G[1024], Gc[1024], err, rr[3], zz[3], zero, chi ;
   gint n, str ;
   
   fprintf(stderr, "modal Green's function test\n") ;
@@ -175,14 +176,21 @@ static void greens_func_test(gfloat r, gfloat r1, gfloat z,
   fprintf(stderr, "N = %d\n", N) ;
 
   str = 3 ;
+  rr[0] = r ; rr[1] = r+0.01 ; rr[2] = r+0.02 ; 
+  zz[0] = z ; zz[1] = z+0.01 ; zz[2] = z+0.02 ;
+  chi = (r*r + r1*r1 + z*z)*0.5/r/r1 ;
+  fprintf(stderr, "chi = %g\n", chi) ;
+  zero = 0 ;
   afmm_laplace_gfunc_f(N, r, r1, z, Gc, str) ;
-  afmm_laplace_gfunc_comp_f(N, r, r1, z, G) ;
+  /* afmm_laplace_gfunc_vec_f(N, rr, 1, zz, 1, &r1, 0, &zero, 0, 3, Gc, str) ; */
+
+  afmm_laplace_gfunc_comp_f(N, rr[0], r1, zz[0], G) ;
 
   err = 0 ;
-  for ( n = 0 ; n <= N ; n ++ ) {
-    fprintf(stdout, "%d %lg %lg (%lg)\n", n, G[n], Gc[n*str],
-	    ABS(G[n]-Gc[n*str])) ;
-    err = MAX(err, fabs(G[n]-Gc[n*str])) ;
+  for ( n = 0 ; n <= N+1 ; n ++ ) {
+    fprintf(stdout, "%d %lg %lg (%lg)\n", n, G[n], Gc[n*str+0],
+	    ABS(G[n]-Gc[n*str+0])) ;
+    err = MAX(err, fabs(G[n]-Gc[n*str+0])) ;
   }
 
   fprintf(stderr, "maximum error: %lg\n", err) ;
@@ -210,9 +218,9 @@ static void series_test(gfloat r, gfloat r1, gfloat z,
   dr = dr1 = dz = 0.0 ;
   /* dz = 0.1 ; */
   /* dz =  */
-  dz = 0.2 ;
-  dr1  = 0.2 ;
-  dr = 0.2 ;
+  dz = 0.0 ;
+  dr1  = 0.0 ;
+  dr = -1e-7 ;
 
   chi = 0.5*(r*r + r1*r1 + z*z)/r1/r ;
   chimin = G_MAXDOUBLE ;
@@ -233,6 +241,12 @@ static void series_test(gfloat r, gfloat r1, gfloat z,
   
   afmm_laplace_gfunc_f(N, r+dr, r1+dr1, z+dz, G, 1) ;
 
+  /* n = 1 ; */
+  /* gint i ; */
+  /* i = 2 ; */
+  /* i = afmm_derivative_offset(0+0+i) + afmm_derivative_index_ijk(0,0,i) ; */
+  /* fprintf(stderr, "%1.16e\n", dG[n*nd+i]) ; */
+  
   for ( n = 0 ; n <= N ; n ++ ) {
     Gs = afmm_gfunc_series_eval_f(L, &(dG[n*nd]), dr, dr1, dz) ;
 
@@ -291,7 +305,8 @@ static void derivative_test(gfloat r, gfloat r1, gfloat x,
   dGm = (gfloat *)g_malloc0((N+1)*nd*sizeof(gfloat)) ;
   dGc = (gfloat *)g_malloc0((N+1)*nd*sizeof(gfloat)) ;
 
-  ee = 1e-6 ;
+  ee = MIN(1e-7, 0.9*r1) ;
+  ee = MIN(ee, 0.9*r) ;
   idx0 = afmm_derivative_offset(i+j+k) + afmm_derivative_index_ijk(i,j,k) ;
 
   dr = dr1 = dx = 0.0 ;
@@ -650,7 +665,7 @@ static void tree_test(gfloat *rz1, gint nrz1)
   
   tree = afmm_tree_new_f(rmin, rmax, zmin, zmax, nrz1, 0) ;
 
-  afmm_tree_add_points_f(tree, rz1, 2*sizeof(gfloat), nrz1, FALSE) ;
+  afmm_tree_add_sources_f(tree, rz1, 2*sizeof(gfloat), nrz1, FALSE) ;
 
   for ( i = 1 ; i <= depth ; i ++ ) {
     afmm_tree_refine_f(tree) ;
@@ -966,17 +981,13 @@ static void morton_test(gint depth)
   return ;
 }
 
-static void interaction_test(guint d, guint i, guint j)
+static void interaction_test(guint d, guint i, guint j, gdouble etol)
 
 {
-  gdouble etol ;
-  
   fprintf(stderr, "box interaction list\n") ;
   fprintf(stderr, "====================\n") ;
   fprintf(stderr, "(i,j) = (%u, %u)\n", i, j) ;
   fprintf(stderr, "depth = %u\n", d) ;
-
-  etol = 3.0/2.0/sqrt(2.0) - 1 ;
 
   afmm_write_radius_interaction_list(d, i, etol, stdout) ;
 
@@ -1097,7 +1108,7 @@ static void s2l_test(gfloat r, gfloat z,
 				forward, outward, S2L) ;
 
   /*generate four at once and check*/
-  afmm_laplace_s2l_matrices_f(N, L, dG, nd, LS, LP,
+  afmm_laplace_s2l_matrices_f(N, L, dG, nd, LS, LP, 1.0,
 				  S2Lfo, S2Lfi, S2Lbo, S2Lbi) ;
   if ( forward ) {
     if ( outward ) Sc = S2Lfo ; else Sc = S2Lfi ;
@@ -1167,6 +1178,47 @@ static void s2l_test(gfloat r, gfloat z,
   return ;
 }
 
+static void vector_test(gfloat r, gfloat r1, gfloat z,	gint N)
+
+{
+  gfloat G[1024], Gv[8192], err, ri[32], r1i[32], zi[32], z1i[32] ;
+  gint n, str, ng, sdist, i ;
+  
+  fprintf(stderr, "modal Green's function test\n") ;
+  fprintf(stderr, "===========================\n") ;
+  fprintf(stderr, "(r, r1, z) = %lg, %lg, %lg\n", r, r1, z) ;
+  fprintf(stderr, "N = %d\n", N) ;
+
+  str = 1 ;
+
+  ng = 13 ; sdist = ng + 3 ;
+
+  for ( i = 0 ; i < ng ; i ++ ) {
+    ri[i] = r + 0.2*g_random_double() ;
+    zi[i] = z + 0.2*g_random_double() ;
+    r1i[i] = r1 + 0.2*g_random_double() ;
+    z1i[i] = 0.0 + 0.2*g_random_double() ;    
+  }
+
+  afmm_laplace_gfunc_vec_f(N, ri, 1, zi, 1, r1i, 1, z1i, 1, ng, Gv, sdist) ;
+  
+  /* afmm_laplace_gfunc_comp_f(N, r, r1, z, G) ; */
+
+  err = 0 ;
+  for ( i = 0 ; i < ng ; i ++ ) {
+    afmm_laplace_gfunc_f(N, ri[i], r1i[i], zi[i]-z1i[i], G, str) ;
+    for ( n = 0 ; n <= N ; n ++ ) {
+      fprintf(stdout, "%d %lg %lg (%lg)\n", n, G[n], Gv[n*sdist+i],
+	      ABS(G[n]-Gv[n*sdist+i])) ;
+      err = MAX(err, fabs(G[n]-Gv[n*sdist+i])) ;
+    }
+  }
+
+  fprintf(stderr, "maximum error: %lg\n", err) ;
+  
+  return ;
+}
+
 gint main(gint argc, gchar **argv)
 
 {
@@ -1174,6 +1226,7 @@ gint main(gint argc, gchar **argv)
   gint M, N, test, n, i, j, k, d, ns, nrz1 ;
   gchar ch, *progname ;
   gboolean forward, outward ;
+  gdouble etol ;
   
   r = 0.5 ; r1 = 0.9 ; z = 2.5 ; chi = 3.0 ;
   N = 16 ; M = 8 ; dx = 0.25 ;
@@ -1181,17 +1234,19 @@ gint main(gint argc, gchar **argv)
   i = j = k = 0 ; d = 1 ;
   rz1 = NULL ;
   forward = TRUE ; outward = TRUE ;
+  etol = 3.0/sqrt(2.0)/2 - 1 ;
   
   progname = g_strdup(g_path_get_basename(argv[0])) ;
   test = -1 ;
   while ( (ch = getopt(argc, argv,
-		       "Bc:D:d:Ii:j:k:M:N:n:R:r:s:T:z:")) != EOF ) {
+		       "Bc:D:d:e:Ii:j:k:M:N:n:R:r:s:T:z:")) != EOF ) {
     switch ( ch ) {
     default: g_assert_not_reached() ; break ;
     case 'B': forward = FALSE ; break ;
     case 'c': chi = atof(optarg) ; break ;
     case 'D': dx  = atof(optarg) ; break ;
     case 'd': d = atoi(optarg) ; break ;
+    case 'e': etol = atof(optarg) ; break ;
     case 'I': outward = FALSE ; break ;
     case 'i': i = atoi(optarg) ; break ;
     case 'j': j = atoi(optarg) ; break ;
@@ -1309,7 +1364,7 @@ gint main(gint argc, gchar **argv)
   }
 
   if ( test == 14 ) {
-    interaction_test((guint)d, (guint)i, (guint)j) ;
+    interaction_test((guint)d, (guint)i, (guint)j, etol) ;
     
     return 0 ;
   }
@@ -1318,6 +1373,12 @@ gint main(gint argc, gchar **argv)
     rz1 = read_points(stdin, &nrz1) ;
 
     s2l_test(r, z, r1, z-dx, rz1, nrz1, N, M, ns, forward, outward) ;
+
+    return 0 ;
+  }
+
+  if ( test == 16 ) {
+    vector_test(r, r1, z, N) ;
 
     return 0 ;
   }

@@ -63,7 +63,7 @@ afmm_tree_t *AFMM_FUNCTION_NAME(afmm_tree_new)(AFMM_REAL rmin, AFMM_REAL rmax,
   t->ip = (guint32 *)g_malloc0(maxpoints*sizeof(guint32)) ;
   t->points = NULL ;
   if ( maxfield != 0 ) 
-    t->ifld = (guint32 *)g_malloc0(maxpoints*sizeof(guint32)) ;
+    t->ifld = (guint32 *)g_malloc0(maxfield*sizeof(guint32)) ;
   t->field  = NULL ;
 
   afmm_tree_box_separation(t) = 3.0/2.0/sqrt(2.0) - 1.0 ;
@@ -81,10 +81,111 @@ afmm_tree_t *AFMM_FUNCTION_NAME(afmm_tree_new)(AFMM_REAL rmin, AFMM_REAL rmax,
   t->size = sizeof(AFMM_REAL) ;
 
   afmm_tree_source_data(t) = NULL ;
+
+  afmm_tree_sources_sorted(t) = FALSE ;
+
+  t->G = NULL ;
+  t->L = 0 ;
   
   return t ;
 }
+
+gint AFMM_FUNCTION_NAME(afmm_tree_init_s2l)(afmm_tree_t *t, guint d, guint L)
+
+{
+  gint nd, i, j, k, b ;
+  guint nb, N ;
+  AFMM_REAL *G, *Gb ;
   
+  g_assert(t->size == sizeof(AFMM_REAL)) ;
+
+  if ( d == 0 ) d = t->depth ;
+  /*maximum number of derivatives*/
+  if ( L == 0 ) {
+    L = 0 ;
+    for ( i = 0 ; i <= d ; i ++ ) {
+      L = MAX(L, t->order_s[i] + t->order_f[i]) ;
+    }
+  }
+
+  N = t->N ;
+  nd = afmm_derivative_offset(L+2)*(N+2) ;
+  t->L = L ; t->ngd = nd ;
+
+  /*number of boxes per side*/
+  nb = 1 << d ;
+
+  /*allocate memory for Green's functions*/
+  t->G = g_malloc0(12*nb*nd*sizeof(AFMM_REAL)) ;
+  G = (AFMM_REAL *)(t->G) ;
+  
+  for ( b = 0 ; b < nb ; b ++ ) {
+    Gb = &(G[12*b*nd]) ;
+    j = 0 ; k = 2 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 0 ; k = 3 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 1 ; k = 2 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 1 ; k = 3 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 2 ; k = 0 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 2 ; k = 1 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 2 ; k = 2 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 2 ; k = 3 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 3 ; k = 0 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 3 ; k = 1 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 3 ; k = 2 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+    j = 3 ; k = 3 ; i = afmm_tree_s2l_index(j, k) ; g_assert(i != -1) ;
+    /* fprintf(stderr, "%d %d %d\n", j, k, i) ; */
+    AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+						       b+j+0.5, b+0.5, k,
+						       &(Gb[i*nd])) ;
+  }
+  
+  return 0 ;
+}
+
 guint64 AFMM_FUNCTION_NAME(afmm_point_index_2d)(AFMM_REAL *rz,
 						AFMM_REAL rmin, AFMM_REAL rmax,
 						AFMM_REAL zmin, AFMM_REAL zmax)
@@ -133,8 +234,8 @@ static gint compare_field_indexed(gconstpointer a, gconstpointer b,
 }
 
 gint AFMM_FUNCTION_NAME(afmm_tree_add_field)(afmm_tree_t *t,
-					      gpointer pts, gsize pstr,
-					      guint npts, gboolean sorted)
+					     gpointer pts, gsize pstr,
+					     guint npts, gboolean sorted)
 
 /*
  * pstr: stride in bytes; components of point are packed in pairs;
@@ -150,7 +251,7 @@ gint AFMM_FUNCTION_NAME(afmm_tree_add_field)(afmm_tree_t *t,
 	    "size of requested target type (%lu))",
 	    __FUNCTION__, t->size, sizeof(AFMM_REAL)) ;
 
-  if ( npts > afmm_tree_point_number_max(t) ) 
+  if ( npts > afmm_tree_field_number_max(t) ) 
     g_error("%s: too many field points (%u) for tree (%u)",
 	    __FUNCTION__, npts, afmm_tree_field_number_max(t)) ;
 
@@ -212,7 +313,7 @@ static gint compare_morton_indexed(gconstpointer a, gconstpointer b,
   return 0 ;
 }
 
-gint AFMM_FUNCTION_NAME(afmm_tree_add_points)(afmm_tree_t *t,
+gint AFMM_FUNCTION_NAME(afmm_tree_add_sources)(afmm_tree_t *t,
 					      gpointer pts, gsize pstr,
 					      guint npts, gboolean sorted)
 
@@ -237,6 +338,8 @@ gint AFMM_FUNCTION_NAME(afmm_tree_add_points)(afmm_tree_t *t,
   afmm_tree_point_number(t) = npts ;
   t->points = (gchar *)pts ; t->pstr = pstr ;
 
+  afmm_tree_sources_sorted(t) = sorted ;
+  
   for ( i = 0 ; i < npts ; i ++ ) {
     rz = afmm_tree_point_index(t, i) ;
     if ( rz[0] < afmm_tree_r_min(t) ||
@@ -258,6 +361,14 @@ gint AFMM_FUNCTION_NAME(afmm_tree_add_points)(afmm_tree_t *t,
   t->boxes[0][0].i = 0 ; 
   t->boxes[0][0].n = npts ; 
 
+  if ( !sorted ) return 0 ;
+
+  for ( i = 0 ; i < npts ; i ++ ) {
+    if ( t->ip[i] != i )
+      g_error("%s: points not sorted (called with sorted == TRUE)",
+	      __FUNCTION__) ;
+  }
+  
   return 0 ;
 }
 
@@ -429,6 +540,7 @@ gint AFMM_FUNCTION_NAME(afmm_tree_coefficient_init)(afmm_tree_t *t,
 
 gint AFMM_FUNCTION_NAME(afmm_tree_leaf_expansions)(afmm_tree_t *t,
 						   AFMM_REAL *Cs, gint cdist,
+						   gint cstr,
 						   gboolean zero_expansions)
 {
   guint32 nb, nc, i, j, s, ns, d, idx, sdist ;
@@ -446,10 +558,11 @@ gint AFMM_FUNCTION_NAME(afmm_tree_leaf_expansions)(afmm_tree_t *t,
   nb = 1 << (2*d) ;
   /*number of coefficients*/
   nc = afmm_coefficient_number(ns) ;
-  /* sdist = nc*2*(N+1) ; */
   sdist = 2*nc ;
 
-  afmm_tree_source_data(t) = Cs ;
+  afmm_tree_source_data(t)    = Cs ;
+  afmm_tree_source_stride(t)  = cstr ;
+  afmm_tree_source_dist(t)    = cdist ;
   
   /*zero the coefficients before accumulating*/
   if ( zero_expansions )
@@ -468,10 +581,10 @@ gint AFMM_FUNCTION_NAME(afmm_tree_leaf_expansions)(afmm_tree_t *t,
     for ( j = 0 ; j < boxes[i].n ; j ++ ) {
       idx = t->ip[boxes[i].i+j] ;
       rz = afmm_tree_point_index(t, idx) ;
-      C = &(Cs[idx*nq*cdist]) ;
+      C = &(Cs[idx*cdist]) ;
       for ( s = 0 ; s < nq ; s ++ ) {
 	AFMM_FUNCTION_NAME(afmm_source_moments)(rz[0]-r, rz[1]-z,
-						&(C[s*cdist]), N, ns,
+						&(C[s*cstr]), N, ns,
 						&(S[s*sdist*(N+1)]), sdist) ;
       }
     }
@@ -547,7 +660,7 @@ gint AFMM_FUNCTION_NAME(afmm_tree_expansion_eval_field)(afmm_tree_t *t,
 						       afmm_tree_z_max(t),
 						       &r1, &rb, &z1, &zb) ;
       r1 += 0.5*rb ; z1 += 0.5*zb ;
-      nd = AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, L,
+      nd = AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N+1, L,
 							      r, r1, z-z1, dG) ;
       C = boxes[i].Cs ;
       AFMM_FUNCTION_NAME(afmm_laplace_field_eval)(N, L, dG, nd,
@@ -570,9 +683,9 @@ gint AFMM_FUNCTION_NAME(afmm_tree_local_field_eval)(afmm_tree_t *t,
   guint64 i, idx ;
   guint32 nb ;
   guint i0, j0, j, k ;
-  AFMM_REAL rz[2] = {r, z}, *P, rc, zc, rb, zb, *Cs ;
+  AFMM_REAL rz[2] = {r, z}, *P, rc, zc, rb, zb ;
   AFMM_REAL work[256] ;
-  gint Lp, pdist, ns, N, sdist ;
+  gint Lp, pdist, ns, N ;
   afmm_box_t *boxes ;
 
   boxes = t->boxes[afmm_tree_depth(t)] ;
@@ -600,8 +713,6 @@ gint AFMM_FUNCTION_NAME(afmm_tree_local_field_eval)(afmm_tree_t *t,
 					  ns, f, fdist) ;
 
   nb = 1 << afmm_tree_depth(t) ;
-  sdist = 2*(N+2) ;
-  Cs = afmm_tree_source_data(t) ;
   afmm_index_decode(i, &i0, &j0) ;
 
   for ( j = 0 ; j < nb ; j ++ ) {
@@ -610,8 +721,8 @@ gint AFMM_FUNCTION_NAME(afmm_tree_local_field_eval)(afmm_tree_t *t,
 				       afmm_tree_box_separation(t)) ) {
 	idx = afmm_index_encode(j, k) ;
 	AFMM_FUNCTION_NAME(afmm_box_field_direct)(t, &(boxes[idx]),
-						  Cs, sdist, ns, N,
-						  rz, f, fdist, FALSE, work) ;
+						  rz, f, fdist, FALSE,
+						  work) ;
       }
     }
   }
@@ -752,9 +863,12 @@ gint AFMM_FUNCTION_NAME(afmm_downward_pass)(afmm_tree_t *t, guint level,
   afmm_box_t *boxes, *cboxes ;
   AFMM_REAL r, r1, dz, *dG, *s2lfo, *s2lfi, *s2lbo, *s2lbi ;
   AFMM_REAL dr, z, *Pp, *Pc ;
-  gint nd, Ls, Lp, N, k, ns ;
+  gint nd, Ls, Lp, N, k, ns, ni ;
   gint s2lr, s2lc, pdist, cdist, order_p, order_c ;
-  AFMM_REAL rt, zt, drt, dzt ;
+  guint ilist[3*512] ;
+#ifdef AFMM_PRECOMPUTE_S2L
+  AFMM_REAL *Gs2l ;
+#endif /*AFMM_PRECOMPUTE_S2L*/
   
   g_assert(level < afmm_tree_depth(t)) ;
 
@@ -776,23 +890,15 @@ gint AFMM_FUNCTION_NAME(afmm_downward_pass)(afmm_tree_t *t, guint level,
     order_c = afmm_tree_field_order(t,level+1) ;    
     pdist = 2*afmm_derivative_offset_2(order_p+1) ;
     cdist = 2*afmm_derivative_offset_2(order_c+1) ;
-    
+
+    nb = 1 << level ;
+    dr = afmm_tree_delta_r(t)/nb ;
+    dz = afmm_tree_delta_z(t)/nb ;
+    dr *= -0.25 ; dz *= -0.25 ;
+    nb *= nb ;
     for ( i = 0 ; i < nb ; i ++ ) {
-      AFMM_FUNCTION_NAME(afmm_box_location_from_index)(i, level,
-						       afmm_tree_r_min(t),
-						       afmm_tree_r_max(t),
-						       afmm_tree_z_min(t),
-						       afmm_tree_z_max(t),
-						       &r, &dr, &z, &dz) ;
-      dr *= -0.25 ; dz *= -0.25 ;
       Pp =  boxes[i].Cf ;
       c = afmm_box_first_child(i) ;
-      AFMM_FUNCTION_NAME(afmm_box_location_from_index)(c, level+1,
-						       afmm_tree_r_min(t),
-						       afmm_tree_r_max(t),
-						       afmm_tree_z_min(t),
-						       afmm_tree_z_max(t),
-						       &rt, &drt, &zt, &dzt) ;
       Pc = cboxes[c+0].Cf ;
       AFMM_FUNCTION_NAME(afmm_expansion_shift)(N,
 					       order_p, Pp, pdist,
@@ -820,8 +926,8 @@ gint AFMM_FUNCTION_NAME(afmm_downward_pass)(afmm_tree_t *t, guint level,
   /*number of boxes per side at level+1*/
   nb = 1 << (level+1) ;
 
-  dr = (afmm_tree_r_max(t) - afmm_tree_r_min(t))/nb ;
-  dz = (afmm_tree_z_max(t) - afmm_tree_z_min(t))/nb ;
+  dr = afmm_tree_delta_r(t)/nb ;
+  dz = afmm_tree_delta_z(t)/nb ;
   g_assert(dr == dz) ;
   
   boxes = t->boxes[level+1] ;
@@ -837,39 +943,67 @@ gint AFMM_FUNCTION_NAME(afmm_downward_pass)(afmm_tree_t *t, guint level,
   s2lbo = &(s2lfi[(N+1)*s2lr*s2lc]) ;
   s2lbi = &(s2lbo[(N+1)*s2lr*s2lc]) ;
 
+  ilist[3*0+0] = 0 ; ilist[3*0+1] = 2 ; 
+  ilist[3*1+0] = 0 ; ilist[3*1+1] = 3 ; 
+  ilist[3*2+0] = 1 ; ilist[3*2+1] = 2 ; 
+  ilist[3*3+0] = 1 ; ilist[3*3+1] = 3 ;
+  ilist[3*4+0] = 2 ; ilist[3*4+1] = 0 ; 
+  ilist[3*5+0] = 2 ; ilist[3*5+1] = 1 ; 
+  ilist[3*6+0] = 2 ; ilist[3*6+1] = 2 ; 
+  ilist[3*7+0] = 2 ; ilist[3*7+1] = 3 ; 
+  ilist[3*8+0] = 3 ; ilist[3*8+1] = 0 ; 
+  ilist[3*9+0] = 3 ; ilist[3*9+1] = 1 ; 
+  ilist[3*10+0] = 3 ; ilist[3*10+1] = 2 ; 
+  ilist[3*11+0] = 3 ; ilist[3*11+1] = 3 ; 
+  ni = 12 ;
+  nd = afmm_derivative_offset(t->L+1) ;
+
   for ( i = 0 ; i < nb ; i ++ ) {
-    guint ilist[3*512] ;
-    gint ni ;
+#ifndef AFMM_PRECOMPUTE_S2L
     afmm_radius_interaction_list(level+1, i,
 				 afmm_tree_box_separation(t),
-				 ilist, &ni, 512) ;
+				 ilist, &ni, 512, TRUE) ;
+    g_assert(ni < 13) ;
     r1 = t->rmin + dr*(i+0.5) ;
+#else /*AFMM_PRECOMPUTE_S2L*/
+    Gs2l = (AFMM_REAL *)(t->G) ;
+    Gs2l = &(Gs2l[i*12*(t->ngd)]) ;
+#endif /*AFMM_PRECOMPUTE_S2L*/   
+
+#ifndef AFMM_PRECOMPUTE_S2L
     for ( k = 0 ; k < ni ; k ++ ) {
-      if ( ilist[3*k+2] == AFMM_INTERACTION_S2L ) {
-	r = t->rmin + dr*(ilist[3*k+0]+0.5) ;
-	z = ilist[3*k+1]*dz ;
-	nd = AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N, Lp+Ls+1,
-								r, r1, z,
-								dG) ;
-	memset(s2lfo, 0, 4*(N+1)*s2lr*s2lc*sizeof(AFMM_REAL)) ;
-	/* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, Lp+Ls+1, dG, nd, Ls, Lp, */
-	/* 					    TRUE, TRUE, s2lfo) ; */
-	/* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, Lp+Ls+1, dG, nd, Ls, Lp, */
-	/* 					    TRUE, FALSE, s2lfi) ; */
-	/* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, Lp+Ls+1, dG, nd, Ls, Lp, */
-	/* 					    FALSE, TRUE, s2lbo) ; */
-	/* AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrix)(N, Lp+Ls+1, dG, nd, Ls, Lp, */
-	/* 					    FALSE, FALSE, s2lbi) ; */
-	AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(N, Lp+Ls+1, dG, nd,
-						      Ls, Lp,
-						      s2lfo, s2lfi,
-						      s2lbo, s2lbi) ;
-	for ( j = 0 ; j < nb ; j ++ ) {
-	  box_expansion_shift_s2l(boxes, N, Ls, Lp, ns, i, j,
-				  ilist[3*k+0]-i, ilist[3*k+1] - 0, nb,
-				  afmm_tree_box_separation(t),
-				  s2lfo, s2lfi, s2lbo, s2lbi) ;
-	}
+      r = t->rmin + dr*(ilist[3*k+0]+0.5) ;
+      z = ilist[3*k+1]*dz ;
+      nd = AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N+1, Lp+Ls,
+							      r, r1, z,
+							      dG) ;
+      memset(s2lfo, 0, 4*(N+1)*s2lr*s2lc*sizeof(AFMM_REAL)) ;
+      AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(N, Lp+Ls, dG, nd,
+						    Ls, Lp, 1.0,
+						    s2lfo, s2lfi,
+						    s2lbo, s2lbi) ;
+#else /*AFMM_PRECOMPUTE_S2L*/      
+    for ( k = 0 ; (k < ni) && (ilist[3*k+0] + i < nb) ; k ++ ) {
+      gint idx ;
+      idx = afmm_tree_s2l_index((ilist[3*k+0]), ilist[3*k+1]) ;
+      g_assert(idx >= 0) ; g_assert(idx < 12) ;
+      memset(s2lfo, 0, 4*(N+1)*s2lr*s2lc*sizeof(AFMM_REAL)) ;
+      AFMM_FUNCTION_NAME(afmm_laplace_s2l_matrices)(N, Lp+Ls,
+						    &(Gs2l[idx*(t->ngd)]),
+						    nd,
+						    Ls, Lp, dr,
+						    s2lfo, s2lfi,
+						    s2lbo, s2lbi) ;
+#endif /*AFMM_PRECOMPUTE_S2L*/   
+      for ( j = 0 ; j < nb ; j ++ ) {
+	box_expansion_shift_s2l(boxes, N, Ls, Lp, ns, i, j,
+#ifndef AFMM_PRECOMPUTE_S2L
+				ilist[3*k+0]-i, ilist[3*k+1]-0, nb,
+#else /*AFMM_PRECOMPUTE_S2L*/   
+				ilist[3*k+0], ilist[3*k+1], nb,
+#endif /*AFMM_PRECOMPUTE_S2L*/   
+				afmm_tree_box_separation(t),
+				s2lfo, s2lfi, s2lbo, s2lbi) ;
       }
     }
   }
@@ -879,55 +1013,90 @@ gint AFMM_FUNCTION_NAME(afmm_downward_pass)(afmm_tree_t *t, guint level,
 					    
 gint AFMM_FUNCTION_NAME(afmm_box_field_direct)(afmm_tree_t *t,
 					       afmm_box_t *b,
-					       AFMM_REAL *src, gint sdist,
-					       gint ns, gint N,
 					       AFMM_REAL *rz,
 					       AFMM_REAL *f, gint fdist,
 					       gboolean zero,
 					       AFMM_REAL *work)
 
 {
-  gint k, idx ;
-  AFMM_REAL *rzsrc ;
+  gint k, idx, cstr, cdist, ns, N, sstr ;
+  AFMM_REAL *rzsrc, *src ;
+
+  cstr = afmm_tree_source_stride(t) ;
+  cdist = afmm_tree_source_dist(t) ;
+  src = afmm_tree_source_data(t) ;
+  ns = afmm_tree_source_size(t) ;
+  N  = afmm_tree_mode_number(t) ;
+
+  sstr = (t->pstr)/sizeof(AFMM_REAL) ;
+  if ( afmm_tree_sources_sorted(t) ) {
+    idx = t->ip[b->i] ;
+    rzsrc = afmm_tree_point_index(t, idx) ;
+    AFMM_FUNCTION_NAME(afmm_laplace_field_direct_vec)(rzsrc, sstr,
+						      &(src[idx*cdist]), cdist,
+						      cstr, ns, b->n, N,
+						      rz, f, fdist, 1, FALSE,
+						      8, work) ;
+    return 0 ;
+  }
   
   for ( k = 0 ; k < b->n ; k ++ ) {
     idx = t->ip[b->i+k] ;
+    /* fprintf(stderr, "   %d\n", idx) ; */
     rzsrc = afmm_tree_point_index(t, idx) ;
     AFMM_FUNCTION_NAME(afmm_laplace_field_direct)(rzsrc,
-						  &(src[idx*ns*sdist]),
-						  sdist, ns, 1, N,
+						  &(src[idx*cdist]),
+						  cstr, ns, 1, N,
 						  rz, f, fdist, 1, FALSE,
 						  work) ;
   }
 
   return 0 ;
 }
-					       
+
+static void box_field(afmm_tree_t *t,
+		      afmm_box_t *boxes, guint i, guint j,
+		      AFMM_REAL *f, gint fdist, AFMM_REAL *work)
+
+{
+  gint idx, k, ns ;
+  AFMM_REAL *rz ;
+  
+  ns = afmm_tree_source_size(t) ;
+  for ( k = 0 ; k < boxes[i].np ; k ++ ) {
+    idx = t->ifld[boxes[i].ip+k] ;
+    /* fprintf(stderr, "%d\n", idx) ; */
+    rz = afmm_tree_field_index(t, idx) ;
+    AFMM_FUNCTION_NAME(afmm_box_field_direct)(t, &(boxes[j]),
+					      rz, &(f[idx*ns*fdist]), fdist,
+					      FALSE, work) ;
+  }
+
+  return ;
+}
+
 gint AFMM_FUNCTION_NAME(afmm_tree_field_eval)(afmm_tree_t *t,
 					      AFMM_REAL *f,
 					      gint fdist)
 
 {
-  guint nb, id, i, j, k, l, i0, j0 ;
-  AFMM_REAL work[256], rc, zc, *P, *Cs, *rz ;
-  gint idx, Lp, pdist, ns, N, sdist ;
+  guint nb, id, i, j, k, l, i0, j0, level ;
+  AFMM_REAL work[16384], rc, zc, *P, *rz ;
+  gint idx, Lp, pdist, ns, N ;
   afmm_box_t *boxes ;
-  
-  nb = 1 << afmm_tree_depth(t) ;
+
+  level = afmm_tree_depth(t) ;
+  nb = 1 << level ;
   boxes = t->boxes[afmm_tree_depth(t)] ;
   Lp = t->order_f[afmm_tree_depth(t)] ;
   pdist = 2*afmm_derivative_offset_2(Lp+1) ;
   ns = afmm_tree_source_size(t) ;
   N  = afmm_tree_mode_number(t) ;
-  Cs = afmm_tree_source_data(t) ;
-  sdist = 2*(N+2) ;
 
-  /*this could be done a lot better: look at using pre-computed
-    interaction lists*/
   for ( i0 = 0 ; i0 < nb ; i0 ++ ) {
-    rc = afmm_tree_r_min(t) + afmm_tree_delta_r(t)*(i0+0.5)/nb ;
+    rc = afmm_tree_box_centre_r(t,i0,afmm_tree_depth(t)) ;
     for ( j0 = 0 ; j0 < nb ; j0 ++ ) {
-      zc = afmm_tree_z_min(t) + afmm_tree_delta_z(t)*(j0+0.5)/nb ;
+      zc = afmm_tree_box_centre_z(t,j0,afmm_tree_depth(t)) ;
       i = afmm_index_encode(i0, j0) ;
       P = boxes[i].Cf ;
       for ( j = 0 ; j < boxes[i].np ; j ++ ) {
@@ -939,66 +1108,98 @@ gint AFMM_FUNCTION_NAME(afmm_tree_field_eval)(afmm_tree_t *t,
 						fdist) ;
       }
 
-      /*look at mutual field calculations for both boxes*/
-      for ( k = 0 ; k < nb ; k ++ ) {
+      for ( k = 0 ; k < i0 ; k ++ ) {
 	for ( l = 0 ; l < nb ; l ++ ) {
 	  if  ( !afmm_grid_boxes_separated(i0, j0, k, l,
 					   afmm_tree_box_separation(t)) ) {
 	    id = afmm_index_encode(k, l) ;
-	    
-	    for ( j = 0 ; j < boxes[i].np ; j ++ ) {
-	      idx = t->ifld[boxes[i].ip+j] ;
-	      rz = afmm_tree_field_index(t, idx) ;
-	      AFMM_FUNCTION_NAME(afmm_box_field_direct)(t, &(boxes[id]),
-							Cs, sdist, ns, N,
-							rz, &(f[idx*ns*fdist]),
-							fdist,
-							FALSE, work) ;
-	    }
+	    box_field(t, boxes, i , id, f, fdist, work) ;
+	    box_field(t, boxes, id, i , f, fdist, work) ;
 	  }
 	}
       }
+
+      k = i0 ; 
+      for ( l = 0 ; l < j0 ; l ++ ) {
+	if  ( !afmm_grid_boxes_separated(i0, j0, k, l,
+					 afmm_tree_box_separation(t)) ) {
+	  id = afmm_index_encode(k, l) ;
+	  box_field(t, boxes, i , id, f, fdist, work) ;
+	  box_field(t, boxes, id, i , f, fdist, work) ;
+	}
+      }
+      box_field(t, boxes, i , i, f, fdist, work) ;      
     }
   }
+  
+  return 0 ;
+}
 
-  /* for ( i = 0 ; i < nb*nb ; i ++ ) { */
-  /*   AFMM_FUNCTION_NAME(afmm_box_location_from_index)(i, afmm_tree_depth(t), */
-  /* 						     afmm_tree_r_min(t), */
-  /* 						     afmm_tree_r_max(t), */
-  /* 						     afmm_tree_z_min(t), */
-  /* 						     afmm_tree_z_max(t), */
-  /* 						     &rc, &rb, &zc, &zb) ; */
-  /*   rc += 0.5*rb ; zc += 0.5*zb ; */
-  /*   P = boxes[i].Cf ; */
-  /*   for ( j = 0 ; j < boxes[i].np ; j ++ ) { */
-  /*     idx = t->ifld[boxes[i].ip+j] ; */
-  /*     rz = afmm_tree_field_index(t, idx) ; */
-  /*     AFMM_FUNCTION_NAME(afmm_expansion_eval)(rz[0]-rc, rz[1]-zc, N, Lp, P, */
-  /* 					      pdist, */
-  /* 					      ns, &(f[idx*ns*fdist]), */
-  /* 					      fdist) ; */
-  /*   } */
+static gint compare_morton_point(gconstpointer a, gconstpointer b,
+				 gpointer data)
 
-  /*   afmm_index_decode(i, &i0, &j0) ; */
-  /*   for ( k = 0 ; k < nb ; k ++ ) { */
-  /*     for ( l = 0 ; l < nb ; l ++ ) { */
-  /* 	if  ( !afmm_grid_boxes_separated(i0, j0, k, l, */
-  /* 					 afmm_tree_box_separation(t)) ) { */
-  /* 	  id = afmm_index_encode(k, l) ; */
-	  
-  /* 	  for ( j = 0 ; j < boxes[i].np ; j ++ ) { */
-  /* 	    idx = t->ifld[boxes[i].ip+j] ; */
-  /* 	    rz = afmm_tree_field_index(t, idx) ; */
-  /* 	    AFMM_FUNCTION_NAME(afmm_box_field_direct)(t, &(boxes[id]), */
-  /* 						      Cs, sdist, ns, N, */
-  /* 						      rz, &(f[idx*ns*fdist]), */
-  /* 						      fdist, */
-  /* 						      FALSE, work) ; */
-  /* 	  } */
-  /* 	} */
-  /*     } */
-  /*   } */
-  /* } */
+{
+  AFMM_REAL *rza = (AFMM_REAL *)a, *rzb = (AFMM_REAL *)b, *lim = data ;
+  guint64 ma, mb ;
+  
+  ma = AFMM_FUNCTION_NAME(afmm_point_index_2d)(rza,
+					       lim[0], lim[1], lim[2], lim[3]) ;
+  mb = AFMM_FUNCTION_NAME(afmm_point_index_2d)(rzb,
+					       lim[0], lim[1], lim[2], lim[3]) ;
+  if ( ma < mb ) return -1 ;
+  if ( ma > mb ) return  1 ;
+  
+  return 0 ;
+}
+  
+gint AFMM_FUNCTION_NAME(afmm_sort_point_list)(AFMM_REAL *pts, gint psize,
+					      gint npts,
+					      AFMM_REAL rmin, AFMM_REAL rmax,
+					      AFMM_REAL zmin, AFMM_REAL zmax)
+
+{
+  AFMM_REAL data[] = {rmin, rmax, zmin, zmax} ;
+
+  g_qsort_with_data(pts, npts, psize, compare_morton_point, (gpointer)data) ;
+  
+  return 0 ;
+}
+
+gint AFMM_FUNCTION_NAME(afmm_box_field_indirect)(afmm_tree_t *t,
+						 guint64 i,
+						 guint level,
+						 AFMM_REAL *rz,
+						 AFMM_REAL *f, gint fdist,
+						 gboolean zero,
+						 AFMM_REAL *work)
+
+{
+  gint N, ns, L, nd, sdist ;
+  AFMM_REAL *S, rb, dr, zb, dz, *dG ;
+  afmm_box_t *boxes ;
+  
+  ns = afmm_tree_source_size(t) ;
+  N  = afmm_tree_mode_number(t) ;
+  L  = afmm_tree_source_order(t, level) ;
+  sdist = 2*afmm_coefficient_number(L) ;
+  dG = work ;
+  
+  boxes = t->boxes[level] ;
+  
+  S = boxes[i].Cs ;
+
+  AFMM_FUNCTION_NAME(afmm_box_location_from_index)(i, level,
+						   t->rmin, t->rmax,
+						   t->zmin, t->zmax,
+						   &rb, &dr, &zb, &dz) ;
+  rb += 0.5*dr ; zb += 0.5*dz ;
+
+  nd = AFMM_FUNCTION_NAME(afmm_laplace_gfunc_derivatives)(N+1, L, rz[0], rb,
+							  rz[1]-zb, dG) ;
+  
+  AFMM_FUNCTION_NAME(afmm_laplace_field_eval)(N, L, dG, nd, S, sdist,
+					      ns,
+					      f, fdist, TRUE, TRUE, FALSE) ;
   
   return 0 ;
 }

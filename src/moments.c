@@ -252,16 +252,6 @@ gint AFMM_FUNCTION_NAME(afmm_expansion_shift)(gint N,
 			   &(Po[s*(N+1)*odist + 2*idxo+1]), odist) ;
 #endif /*AFMM_SINGLE_PRECISION*/
 	  }
-	  /* for ( n = 0 ; n <= N ; n ++ ) { */
-	  /*   for ( s = 0 ; s < ns ; s ++ ) { */
-	  /*     Po[s*(N+1)*odist + n*odist + 2*idxo + 0] += */
-	  /* 	Pi[s*(N+1)*idist + n*idist + 2*idxi + 0]* */
-	  /* 	afmm_binomial(i+q,i)*afmm_binomial(j+u,j)*drp*dzp ; */
-	  /*     Po[s*(N+1)*odist + n*odist + 2*idxo + 1] += */
-	  /* 	Pi[s*(N+1)*idist + n*idist + 2*idxi + 1]* */
-	  /* 	afmm_binomial(i+q,i)*afmm_binomial(j+u,j)*drp*dzp ; */
-	  /*   } */
-	  /* } */
 	  dzp *= -dz ;
 	}
 	drp *= -dr ;

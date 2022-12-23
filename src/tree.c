@@ -27,6 +27,9 @@
 
 #include "afmm-private.h"
 
+const gint _s2l_matrix_index[] =
+  {-1, -1, 0, 1, -1, -1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} ;
+
 gint afmm_tree_add_level(afmm_tree_t *t)
 
 {
@@ -156,10 +159,47 @@ gboolean afmm_grid_boxes_separated(guint ir, guint iz,
 				   gdouble etol)
 
 {
-  guint rmin, rmax,  zmin, zmax ;
+  gdouble rmin, rmax,  zmin, zmax ;
 
-  if ( ir == jr && iz == jz ) return FALSE ;
+  if ( ir == jr ) {
+    if ( iz == jz   ) return FALSE ;
+    if ( iz == jz+1 ) return FALSE ;
+    if ( jz == iz+1 ) return FALSE ;
+  }
+
+  if ( ir == jr + 1 ) {
+    if ( iz == jz   ) return FALSE ;
+    if ( iz == jz+1 ) return FALSE ;
+    if ( jz == iz+1 ) return FALSE ;
+  }
+
+  if ( jr == ir + 1 ) {
+    if ( iz == jz   ) return FALSE ;
+    if ( iz == jz+1 ) return FALSE ;
+    if ( jz == iz+1 ) return FALSE ;
+  }
   
+  /* if ( ir == jr + 2 ) { */
+  /*   if ( iz <= jz+1 ) return FALSE ; */
+  /*   if ( jz <= iz+1 ) return FALSE ; */
+  /* } */
+
+  /* if ( jr == ir + 2 ) { */
+  /*   if ( iz <= jz+1 ) return FALSE ; */
+  /*   if ( jz <= iz+1 ) return FALSE ; */
+  /* } */
+
+  /* if ( ir == 0 && jr == 0 ) { */
+  /*   if ( iz == jz + 3 ) return FALSE ; */
+  /*   if ( jz == iz + 3 ) return FALSE ; */
+  /*   if ( iz == jz + 2 ) return FALSE ; */
+  /*   if ( jz == iz + 2 ) return FALSE ; */
+  /* } */
+  
+  return TRUE ;
+  
+  if ( ir == jr && iz == jz ) return FALSE ;
+
   if ( ir == jr ) {
     rmin = ir + 1 ; rmax = ir + 1 ;
     zmin = MIN(iz, jz) + 1 ;
@@ -171,7 +211,6 @@ gboolean afmm_grid_boxes_separated(guint ir, guint iz,
   rmin = MIN(ir, jr) + 1 ;
   rmax = MAX(ir, jr)     ;
   if ( iz == jz ) {
-    /* zmin = zmax = iz ; */
     zmin = iz ;
     zmax = iz ;
   } else {
@@ -181,6 +220,30 @@ gboolean afmm_grid_boxes_separated(guint ir, guint iz,
   
   return (rmin*rmin + rmax*rmax + (zmax-zmin)*(zmax-zmin) >
 	  2.0*rmin*rmax*(1.0 + etol)) ;
+}
+
+gboolean afmm_grid_boxes_touch(guint ir, guint iz, guint jr, guint jz)
+
+{
+  if ( ir == jr ) {
+    if ( iz == jz   ) return TRUE ;
+    if ( iz == jz+1 ) return TRUE ;
+    if ( jz == iz+1 ) return TRUE ;
+  }
+
+  if ( ir == jr + 1 ) {
+    if ( iz == jz   ) return TRUE ;
+    if ( iz == jz+1 ) return TRUE ;
+    if ( jz == iz+1 ) return TRUE ;
+  }
+
+  if ( jr == ir + 1 ) {
+    if ( iz == jz   ) return TRUE ;
+    if ( iz == jz+1 ) return TRUE ;
+    if ( jz == iz+1 ) return TRUE ;
+  }
+
+  return FALSE ;
 }
 
 gboolean afmm_boxes_separated(guint i, guint j, gdouble etol)
@@ -194,9 +257,38 @@ gboolean afmm_boxes_separated(guint i, guint j, gdouble etol)
   return afmm_grid_boxes_separated(ir, iz, jr, jz, etol) ;
 }
 
+gboolean afmm_grid_box_point_separated(afmm_tree_t *t,
+				       gdouble r, gdouble z,
+				       guint i, guint j, guint d)
+
+{
+  gdouble rb, zb, etol, dr, dz ;
+  guint nb ;
+  
+  etol = afmm_tree_box_separation(t) ;
+
+  rb = afmm_tree_box_centre_r(t,i,d) ;
+  zb = afmm_tree_box_centre_z(t,j,d) ;
+
+  nb = 1 << d ;
+  dr = 0.5*afmm_tree_delta_r(t)/nb ;
+  dz = 0.5*afmm_tree_delta_z(t)/nb ;
+
+  if ( r > rb + dr ) rb += dr ;
+  if ( r < rb - dr ) rb -= dr ;
+  if ( rb - dr < r && r < rb + dr ) rb = r ;
+  if ( z > zb + dz ) zb += dz ;
+  if ( z < zb - dz ) zb -= dz ;
+  if ( zb - dz < z && z < zb + dz ) zb = z ;
+  
+  return (rb*rb + r*r + (z-zb)*(z-zb) > 2.0*rb*r*(1.0 + etol)) ;
+}
+
 gint afmm_radius_interaction_list(guint d, guint i0,
 				  gdouble etol,
-				  guint *ilist, gint *ni, gint nimax)
+				  guint *ilist,
+				  gint *ni, gint nimax,
+				  gboolean s2l)
 
 /*
  * ilist stride is 3: i j interaction_type
@@ -212,16 +304,24 @@ gint afmm_radius_interaction_list(guint d, guint i0,
    * this looks for interaction boxes outboard of (greater radius
    * than) i0
    */
+  
+  if ( !s2l ) {  
+    for ( i = i0 ; i < nb ; i ++ ) {
+      for ( j = 0 ; j < nb ; j ++ ) {
+	if ( !afmm_grid_boxes_separated(i0, 0, i, j, etol) ) {
+	  ilist[(*ni)*3+0] = i ;
+	  ilist[(*ni)*3+1] = j ;
+	  ilist[(*ni)*3+2] = AFMM_INTERACTION_DIRECT ;
+	  g_assert((*ni) < nimax) ;
+	  (*ni) ++ ;
+	}
+      }
+    }
+  }
+  
   for ( i = i0 ; i < nb ; i ++ ) {
     for ( j = 0 ; j < nb ; j ++ ) {
-      if ( !afmm_grid_boxes_separated(i0, 0, i, j, etol) ) {
-	ilist[(*ni)*3+0] = i ;
-	ilist[(*ni)*3+1] = j ;
-	ilist[(*ni)*3+2] = AFMM_INTERACTION_DIRECT ;
-	g_assert((*ni) < nimax) ;
-	(*ni) ++ ;
-      } else {
-	/*check separation of parent boxes*/
+      if ( afmm_grid_boxes_separated(i0, 0, i, j, etol) ) {
 	if ( !afmm_grid_boxes_separated(i0/2, 0, i/2, j/2, etol) ) {
 	  ilist[(*ni)*3+0] = i ;
 	  ilist[(*ni)*3+1] = j ;
@@ -259,7 +359,7 @@ gint afmm_write_radius_interaction_list(guint d, guint i,
   guint ilist[512*3] ;
   gint ni, j ;
   
-  afmm_radius_interaction_list(d, i, etol, ilist, &ni, 512) ;
+  afmm_radius_interaction_list(d, i, etol, ilist, &ni, 512, FALSE) ;
 
   for ( j = 0 ; j < ni ; j ++ ) {
     write_radius_box(f, &(ilist[3*j])) ;

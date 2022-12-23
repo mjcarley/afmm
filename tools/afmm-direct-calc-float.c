@@ -58,7 +58,6 @@ static void points_read(FILE *f, gint *np, gint *N, gint *ns,
 	for ( k = 0 ; k <= *N ; k ++ ) {
 	  fscanf(f, "%g", &((*src)[i*(*ns)*str + j*str + 2*k + 0])) ;
 	  fscanf(f, "%g", &((*src)[i*(*ns)*str + j*str + 2*k + 1])) ;
-		 /* &((*src)[i*(*ns)*str + j])) ; */
 	}
       }
     }
@@ -127,7 +126,7 @@ gint main(gint argc, gchar **argv)
   fld = (gfloat *)
     fftw_malloc(nfld*2*(N+2)*ns*sizeof(gfloat)) ;
   
-  work = (gfloat *)g_malloc0((N+1)*sizeof(gfloat)) ;
+  work = (gfloat *)g_malloc0(32*(N+1)*sizeof(gfloat)) ;
 
   sstr = 2*(N+2) ;
   fstr = 2*(N+2) ;
@@ -135,9 +134,14 @@ gint main(gint argc, gchar **argv)
   fprintf(stderr, "%s: evaluating field; %lg\n",
 	  progname, g_timer_elapsed(timer, NULL)) ;
   
-  afmm_laplace_field_direct_f(rz1, src, sstr, ns, nsrc, N,
-				  rz, fld, fstr, nfld, TRUE, work) ;
-
+  /* afmm_laplace_field_direct_f(rz1, src, sstr, ns, nsrc, N, */
+  /* 				  rz, fld, fstr, nfld, TRUE, work) ; */
+  for ( i = 0 ; i < nfld ; i ++ ) {
+    afmm_laplace_field_direct_vec_f(rz1, 2, src, ns*sstr, sstr, ns, nsrc, N,
+					&(rz[2*i]), &(fld[i*ns*fstr]), fstr, 1,
+					TRUE, 32, work) ;
+  }
+  
   fprintf(stderr, "%s: field evaluated; %lg\n",
 	  progname, g_timer_elapsed(timer, NULL)) ;
 

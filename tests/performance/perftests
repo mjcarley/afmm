@@ -1,0 +1,33 @@
+#!/bin/bash
+
+NSRC='1024 2048 4096 8192 16384 32768 65536 131072'
+
+#24576 40960 49152 57344'
+
+##for nsrc in ${NSRC} ; do
+##    sed s/NSOURCES/${nsrc}/ < perfsources.ip > sources.dat
+##    sed s/NFIELD/${nsrc}/ < perffield.ip > field.dat
+##    ../../tools/afmm-direct-calc -s sources.dat \
+##				 -f field.dat > direct-${nsrc}.dat \
+##				 2> direct-${nsrc}.log
+##    mv direct-${nsrc}.log direct-${nsrc}.dat Data
+##done
+
+##exit
+
+for depth in 7 ; do
+    for order in 6 8 10 12 14 16 ; do
+	for nsrc in ${NSRC} ; do
+	    sed s/NSOURCES/${nsrc}/ < perfsources.ip > sources.dat
+	    sed s/NFIELD/${nsrc}/ < perffield.ip > field.dat
+
+	    ../../tools/afmm-tree-calc -s sources.dat -f field.dat \
+				   -S ${order} -F ${order} -D ${depth} \
+				   -e 2e-2 -o 2 \
+				   -O > tree-${depth}-${order}-${nsrc}.dat \
+				   2> tree-${depth}-${order}-${nsrc}.log
+	    mv tree-${depth}-${order}-${nsrc}.log \
+	       tree-${depth}-${order}-${nsrc}.dat Data
+	done
+    done
+done

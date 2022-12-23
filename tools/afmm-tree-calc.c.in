@@ -26,35 +26,48 @@
 
 #include "afmm-private.h"
 
+#define AFMM_INTERLEAVE_SOURCE_DATA
+
 GTimer *timer ;
 gchar *progname ;
 
 static void points_read(FILE *f, gint *np, guint *N, guint *ns,
-			AFMM_REAL **rz, AFMM_REAL **src)
+			AFMM_REAL **rz, gint *pstr,
+			AFMM_REAL **src, gint *sdist, gint *sstr)
 
 {
-  gint i, j, k, str ;
+  gint i, j, k ;
   
   fscanf(f, "%d %d %d", np, N, ns) ;
 
   /*FFTW3 stride for C2R transforms*/
-  str = 2*((*N)+2) ;
+  (*sstr) = 2*((*N)+2) ;
+  *sdist = (*sstr)*(*ns) ;
+  *pstr = 2 ;
+#ifdef AFMM_INTERLEAVE_SOURCE_DATA
+  *sdist += 2 ;
+  *pstr = *sdist ;
+#endif /*AFMM_INTERLEAVE_SOURCE_DATA*/
+  *rz = (AFMM_REAL *)fftw_malloc((*np)*(*pstr)*sizeof(AFMM_REAL)) ;
 
-  *rz = (AFMM_REAL *)g_malloc0((*np)*2*sizeof(AFMM_REAL)) ;
   if ( *ns != 0 ) {
-    *src = (AFMM_REAL *)
-      fftw_malloc((*np)*str*(*ns)*sizeof(AFMM_REAL)) ;
+#ifdef AFMM_INTERLEAVE_SOURCE_DATA
+    *src = &((*rz)[2]) ;
+#else /*AFMM_INTERLEAVE_SOURCE_DATA*/
+    *src = (AFMM_REAL *)fftw_malloc((*np)*(*sdist)*sizeof(AFMM_REAL)) ;
+#endif /*AFMM_INTERLEAVE_SOURCE_DATA*/    
   } else {
     src = NULL ;
   }
 
   for ( i = 0 ; i < *np ; i ++ ) {
-    fscanf(f, "%FLOATFMT %FLOATFMT", &((*rz)[2*i+0]), &((*rz)[2*i+1])) ;
+    fscanf(f, "%FLOATFMT %FLOATFMT",
+	   &((*rz)[i*(*pstr)+0]), &((*rz)[i*(*pstr)+1])) ;
     if ( src != NULL ) {
       for ( j = 0 ; j < *ns ; j ++ ) {
 	for ( k = 0 ; k <= *N ; k ++ ) {
-	  fscanf(f, "%FLOATFMT", &((*src)[i*(*ns)*str + j*str + 2*k + 0])) ;
-	  fscanf(f, "%FLOATFMT", &((*src)[i*(*ns)*str + j*str + 2*k + 1])) ;
+	  fscanf(f, "%FLOATFMT", &((*src)[i*(*sdist) + j*(*sstr) + 2*k + 0])) ;
+	  fscanf(f, "%FLOATFMT", &((*src)[i*(*sdist) + j*(*sstr) + 2*k + 1])) ;
 	}
       }
     }
@@ -67,13 +80,16 @@ gint main(gint argc, gchar **argv)
 
 {
   AFMM_REAL rmin, rmax, zmin, zmax, *rz1, *rz, *C, *fld, *work ;
-  guint npts, ns, N, Nf, order[48] = {0}, order_s, order_f, order_max ;
+  AFMM_REAL etol ;
+  guint ns, N, Nf, order[48] = {0}, order_s, order_f, order_max ;
   guint depth, order_s_max, order_f_max ;
   /* guint r_trace, z_trace ; */
-  gint i, j, k, nrz1, cdist, nfld, testdepth, wsize ;
+  gint i, j, k, nrz1, cdist, nfld, testdepth, wsize, order_inc ;
+  gint fpstr, fstr, pstr, cstr ;
   gchar ch, *sfile, *ffile ;
   afmm_tree_t *tree ;
-  gboolean downward, trace_field, trace_source ;
+  gboolean downward, sort_sources ;
+  /* trace_field, trace_source ; */
   FILE *input ;
   
   rmin = 0 ; rmax = 1 ;
@@ -85,24 +101,30 @@ gint main(gint argc, gchar **argv)
   /*set to FALSE to suppress downward propagation of field
     expansions (so only local interactions are included)*/
   downward = TRUE ;
+  sort_sources = FALSE ;
   /* r_trace = z_trace = 65536 ; */
-  trace_field = FALSE ; trace_source = FALSE ;
+  /* trace_field = FALSE ; trace_source = FALSE ; */
   /* trace_field = TRUE ; */
   /* trace_source = TRUE ; */
+  etol = 0.0 ;
+  order_inc = 2 ;
   
   progname = g_strdup(g_path_get_basename(argv[0])) ;
   timer = g_timer_new() ;
 
-  while ( (ch = getopt(argc, argv, "D:d:F:f:lR:r:S:s:Z:z:")) != EOF ) {
+  while ( (ch = getopt(argc, argv, "D:d:e:F:f:lOo:R:r:S:s:Z:z:")) != EOF ) {
     switch ( ch ) {
     default: g_assert_not_reached() ; break ;
     case 'D': depth = atoi(optarg) ; break ;
     case 'd': testdepth = atoi(optarg) ; break ;
+    case 'e': etol = atof(optarg) ; break ;
     case 'F': order_f = atoi(optarg) ; break ;
     case 'f': ffile = g_strdup(optarg) ; break ;
     /* case 'I': r_trace = atoi(optarg) ; break ; */
     /* case 'J': z_trace = atoi(optarg) ; break ; */
     case 'l': downward = FALSE ; break ;
+    case 'O': sort_sources = TRUE ; break ;
+    case 'o': order_inc = atoi(optarg) ; break ;
     case 'R': rmax = atof(optarg) ; break ; 
     case 'r': rmin = atof(optarg) ; break ; 
     case 'S': order_s = atoi(optarg) ; break ;
@@ -122,11 +144,11 @@ gint main(gint argc, gchar **argv)
     exit(1) ;
   }
 
-  points_read(input, &nfld, &Nf, &ns, &rz, &fld) ;
+  points_read(input, &nfld, &Nf, &ns, &rz, &fpstr, &fld, &fstr, &cstr) ;
 
   fclose(input) ;
   fprintf(stderr, "%s: %d field points\n", progname, nfld) ;
-
+  
   if ( sfile == NULL ) {
     fprintf(stderr, "%s: source file must be defined\n", progname) ;
     exit(1) ;    
@@ -137,23 +159,25 @@ gint main(gint argc, gchar **argv)
     exit(1) ;
   }
 
-  points_read(input, &nrz1, &N, &ns, &rz1, &C) ;
+  points_read(input, &nrz1, &N, &ns, &rz1, &pstr, &C, &cdist, &cstr) ;
 
   fclose(input) ;
+
+  if ( sort_sources ) {
+    afmm_sort_point_list_FLOAT(rz1, pstr*sizeof(AFMM_REAL), nrz1,
+			       rmin, rmax, zmin, zmax) ;
+  }
   
   fprintf(stderr, "%s: %d source points\n", progname, nrz1) ;
   fprintf(stderr, "%s: modal order %d\n", progname, N) ;
-  fprintf(stderr, "%s: %d source components\n", progname, ns) ;
+  fprintf(stderr, "%s: %d source components; %lg\n",
+	  progname, ns, g_timer_elapsed(timer, NULL)) ;
   
   fld = (AFMM_REAL *)fftw_malloc(nfld*(2*N+4)*ns*sizeof(AFMM_REAL)) ;
   memset(fld, 0, nfld*(2*N+4)*ns*sizeof(AFMM_REAL)) ;
 
-  npts = nrz1 + nfld ;
-
   tree = afmm_tree_new_FLOAT(rmin, rmax, zmin, zmax, nrz1, nfld) ;
-
-  /* afmm_tree_box_separation(tree) = 1e-2 ; */
-  
+  if ( etol != 0.0 ) afmm_tree_box_separation(tree) = etol ;
   afmm_tree_source_size(tree) = ns ;
   afmm_tree_mode_number(tree) = N ;
 
@@ -164,8 +188,8 @@ gint main(gint argc, gchar **argv)
   order_s_max = order_s ;
   order_f_max = order_f ;
   for ( i = depth-1 ; i > 0 ; i -- ) {
-    order[2*i+0] = order[2*(i+1)+0] + 4 ;
-    order[2*i+1] = order[2*(i+1)+1] + 4 ;
+    order[2*i+0] = order[2*(i+1)+0] + order_inc ;
+    order[2*i+1] = order[2*(i+1)+1] + order_inc ;
     order_max = MAX(order_max, order[2*i+0] + order[2*i+1]) ;
     order_s_max = MAX(order_s_max, order[2*i+0]) ;
     order_f_max = MAX(order_f_max, order[2*i+1]) ;
@@ -180,15 +204,16 @@ gint main(gint argc, gchar **argv)
     
   fprintf(stderr, "%s: workspace size: %d\n", progname, wsize) ;
   work = (AFMM_REAL *)g_malloc0(wsize*sizeof(AFMM_REAL)) ;
-  
+
   /*add points to the tree*/
-  afmm_tree_add_points_FLOAT(tree, rz1, 2*sizeof(AFMM_REAL), nrz1, FALSE) ;
-  afmm_tree_add_field_FLOAT(tree, rz, 2*sizeof(AFMM_REAL), nfld, FALSE) ;
+  afmm_tree_add_sources_FLOAT(tree, rz1, pstr*sizeof(AFMM_REAL), nrz1,
+			      sort_sources) ;
+  afmm_tree_add_field_FLOAT(tree, rz, fpstr*sizeof(AFMM_REAL), nfld, FALSE) ;
   
   for ( i = 1 ; i <= depth ; i ++ ) {
     afmm_tree_refine_FLOAT(tree) ;
   }
-
+  
   /* if ( r_trace < 65536 && z_trace == 65536 ) { */
 
   /*   afmm_trace_interactions(tree, r_trace, stdout) ; */
@@ -204,34 +229,42 @@ gint main(gint argc, gchar **argv)
   /*   return 0 ; */
   /* } */
   
-  if ( trace_source ) {
-    i = 0 ;
-    guint64 idx, jdx ;
-    idx = afmm_point_index_2d_FLOAT(&(rz1[2*i]),
-				    afmm_tree_r_min(tree),
-				    afmm_tree_r_max(tree),
-				    afmm_tree_z_min(tree),
-				    afmm_tree_z_max(tree)) ;
-    fprintf(stderr, "%d:", i) ;
-    for ( j = 0 ; j <= afmm_tree_depth(tree) ; j ++ ) {
-      jdx = afmm_point_locate_box(idx, j) ;
-      fprintf(stderr, " %lu", jdx) ;
-    }
-    fprintf(stderr, "\n") ;
-    return 0 ;
-  }
+  /* if ( trace_source ) { */
+  /*   i = 0 ; */
+  /*   guint64 idx, jdx ; */
+  /*   idx = afmm_point_index_2d_FLOAT(&(rz1[2*i]), */
+  /* 				    afmm_tree_r_min(tree), */
+  /* 				    afmm_tree_r_max(tree), */
+  /* 				    afmm_tree_z_min(tree), */
+  /* 				    afmm_tree_z_max(tree)) ; */
+  /*   fprintf(stderr, "%d:", i) ; */
+  /*   for ( j = 0 ; j <= afmm_tree_depth(tree) ; j ++ ) { */
+  /*     jdx = afmm_point_locate_box(idx, j) ; */
+  /*     fprintf(stderr, " %lu", jdx) ; */
+  /*   } */
+  /*   fprintf(stderr, "\n") ; */
+  /*   return 0 ; */
+  /* } */
   
   /*source data*/
-  cdist = (2*N+4) ;
+  /* cdist = (2*N+4) ; */
   
   for ( i = 1 ; i <= depth ; i ++ ) {
     afmm_tree_coefficient_init(tree, i, order[2*i+1], order[2*i+0]) ;
   }
 
+#ifdef AFMM_PRECOMPUTE_S2L
+  fprintf(stderr, "%s: initializing shift matrices; %lg\n",
+	  progname, g_timer_elapsed(timer, NULL)) ;  
+  afmm_tree_init_s2l_FLOAT(tree, 0, 0) ;
+  fprintf(stderr, "%s: shift matrices initialized; %lg\n",
+	  progname, g_timer_elapsed(timer, NULL)) ;  
+#endif /*AFMM_PRECOMPUTE_S2L*/
+  
   fprintf(stderr, "%s: initializing leaf expansions; %lg\n",
 	  progname, g_timer_elapsed(timer, NULL)) ;
 
-  afmm_tree_leaf_expansions_FLOAT(tree, C, cdist, TRUE) ;
+  afmm_tree_leaf_expansions_FLOAT(tree, C, cdist, cstr, TRUE) ;
 
   fprintf(stderr, "%s: leaf expansions initialized; %lg\n",
 	  progname, g_timer_elapsed(timer, NULL)) ;

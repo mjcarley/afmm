@@ -27,6 +27,18 @@
 
 #include "afmm-private.h"
 
+#ifdef AFMM_SINGLE_PRECISION
+#define ELLIP_TOL 1e-7
+#define EPS 1.0e-7
+#define TINY 1.0e-32
+#define NPRE 300
+#else /*AFMM_SINGLE_PRECISION*/
+#define ELLIP_TOL 1e-14
+#define EPS 1.0e-16
+#define TINY 1.0e-280
+#define NPRE 300
+#endif /*AFMM_SINGLE_PRECISION*/
+
 static void carlson_R(AFMM_REAL x, AFMM_REAL y, AFMM_REAL *RF, AFMM_REAL *RG,
 		      AFMM_REAL tol)
 
@@ -103,7 +115,7 @@ gint AFMM_FUNCTION_NAME(afmm_legendre_Q)(gint N, gint M,
 					 AFMM_REAL chi,
 					 AFMM_REAL *Q, gint ldq)
 /*
- * associated Legendre polynomials Q_{n-1/2}(\chi) and derivatives
+ * Legendre functions Q_{n-1/2}(\chi) and derivatives
  */
   
 {
@@ -179,3 +191,193 @@ gint AFMM_FUNCTION_NAME(afmm_legendre_Q)(gint N, gint M,
   
 /*   return 0 ; */
 /* } */
+
+gint AFMM_FUNCTION_NAME(afmm_legendre_nm12)(AFMM_REAL x, gint N,
+					    AFMM_REAL *P, gint pstr,
+					    AFMM_REAL *Q, gint qstr)
+
+/*
+ * Legendre functions P_{\nu}, Q_{\nu}, \nu=n-1/2, n=0, ..., N
+ *
+ * Based on paper and code of 
+ * 
+ * Gil and Segura, Evaluation of Legendre functions of argument
+ * greater than one, Computer Physics Communications
+ * 105(2--3):273--283, 1997.
+ * 
+ * https://doi.org/10.1016/S0010-4655(97)00076-3
+ * 
+ */
+  
+{
+  AFMM_REAL alpha, delta, a1, a2, K, E, cant, B, A, fc, C0, D0, PNp1, QNp1 ;
+  gint n, m ;
+  
+  g_assert(x > 1.0) ;
+
+  alpha = LOG(x + SQRT(x*x - 1.0)) ;
+
+  a1 = SQRT((x-1.0)/(x+1.0)) ;
+  a2 = SQRT(2.0*SQRT(x*x - 1.0)/(x + SQRT(x*x-1.0))) ;
+
+  AFMM_FUNCTION_NAME(afmm_elliptic_KE)(a1, &K, &E) ;
+  P[0*pstr] = 2.0/M_PI*SQRT(2.0/(x+1.0))*K ;
+  AFMM_FUNCTION_NAME(afmm_elliptic_KE)(a2, &K, &E) ;
+  P[1*pstr] = 2.0/M_PI*SQRT(x+SQRT(x*x-1.0))*E ;
+
+  cant = 0.5*(LOG(2.0*M_PI) + LOG(SINH(alpha))) + LOG(10.0)*NPRE ;
+
+  while ( alpha*N - 0.5*LOG(N - 0.5) > cant ) {
+    N -= 3 ;
+  }
+
+  /*forward recurrence for P_{n-1/2}*/
+  for ( n = 1 ; n < N ; n ++ ) {
+    P[(n+1)*pstr] = (2.0*n*x*P[n*pstr] - (n-0.5)*P[(n-1)*pstr])/(n+0.5) ;
+  }
+  /*spare value of P to avoid array overrun*/
+  n = N ;
+  PNp1 = (2.0*n*x*P[n*pstr] - (n-0.5)*P[(n-1)*pstr])/(n+0.5) ;
+
+  n = N ;
+
+  m = 0 ;
+  B = 2.0*(n+1.0)*x/(n+0.5) ;
+  A = 1.0 ;
+  fc = TINY ;
+  C0 = fc ;
+  D0 = 0.0 ;
+
+  do {
+    D0 = B + A*D0 ;
+    if ( D0 == 0.0 ) D0 = TINY ;
+    C0 = B+A/C0 ;
+    if ( C0 == 0.0 ) C0 = TINY ;
+    D0 = 1.0/D0 ;
+    delta = C0*D0 ;
+    fc *= delta ;
+    m ++ ;
+    A = -(1.0 + 1.0/(n + m - 0.5)) ;
+    B = 2.0*(n+m+1.0)*x/(n + m + 0.5) ;
+  } while (ABS(delta - 1.0) > EPS) ;
+
+  Q[N*qstr] = 1.0/(PNp1 - fc*P[N*pstr])/(N+0.5) ;
+  /*spare value of Q*/
+  QNp1 = Q[N*qstr]*fc ;
+
+  n = N ;
+  Q[(n-1)*qstr] = (2.0*n*x*Q[n*qstr] - (n+0.5)*QNp1)/(n - 0.5) ;
+  for ( n = N-1 ; n > 0 ; n -- ) {
+    Q[(n-1)*qstr] = (2.0*n*x*Q[n*qstr] - (n+0.5)*Q[(n+1)*qstr])/(n - 0.5) ;
+  }
+  
+  return 0 ;
+}
+
+AFMM_REAL AFMM_FUNCTION_NAME(afmm_hyperg_2F1)(AFMM_REAL a, AFMM_REAL b,
+					      AFMM_REAL c, AFMM_REAL x)
+
+{
+  AFMM_REAL F, tol, cft ;
+  gint q ;
+  
+#ifdef AFMM_SINGLE_PRECISION
+  tol = 1e-7 ;
+#else /*AFMM_SINGLE_PRECISION*/
+  tol = 1e-15 ;
+#endif /*AFMM_SINGLE_PRECISION*/
+
+  cft = 1.0/GAMMA(c) ;
+
+  F = cft ;
+
+  for ( q = 0 ; (q < 16) && ( cft > tol) ; q ++ ) {
+    cft *= (a+q)/(c+q)*(b+q)/(1.0+q)*x ;
+    /* (a+q)*(b+q)/(c+q)/(q+1) ;     */
+    F += cft ;
+  }
+
+  g_assert(cft < tol) ;
+  
+  return F ;
+}
+
+gint AFMM_FUNCTION_NAME(afmm_legendre_Q_rec)(gint N, AFMM_REAL chi,
+					     AFMM_REAL *Q, gint str)
+
+/*
+ * Method of
+ * 
+ * An explicit kernel-split panel-based Nystrom scheme
+ * for integral equations on axially symmetric surfaces
+ * Johan Helsing, Anders Karlsson, J Comp Phys, 2014
+ * 
+ * http://dx.doi.org/10.1016/j.jcp.2014.04.053
+ * 
+ */
+  
+{
+  AFMM_REAL csw, K, E, mu, sc, Qn, Qnm1 ;
+  gint n, M ;
+  
+  csw = 1.008 ;
+  g_assert(chi > 1.0) ;
+  
+  /*forward recursion for \chi<=1.008*/
+  if ( chi < csw ) {
+    mu = SQRT(2.0/(1.0+chi)) ;
+    AFMM_FUNCTION_NAME(afmm_elliptic_KE)(mu, &K, &E) ;
+
+    Q[0*str] = mu*K ;
+    if ( N == 0 ) return 0 ;
+    Q[1*str] = chi*mu*K - (1.0 + chi)*mu*E ;
+    if ( N == 1 ) return 0 ;
+
+    for ( n = 2 ; n <= N ; n ++ ) {
+      Q[n*str] = (4.0*n-4)/(2.0*n-1)*chi*Q[(n-1)*str] -
+	(2.0*n-3)/(2.0*n-1)*Q[(n-2)*str] ;
+    }
+    
+
+    sc = chi*mu*K - (1.0+chi)*mu*E ;
+    if ( ABS(sc - Q[1*str]) > 1e-9 ) {
+      g_error("%s: recursion failure on Q_1=%lg, should be %lg, "
+	      "difference = %lg",
+	    __FUNCTION__, sc, Q[1*str], ABS(sc-Q[1*str])) ;
+    }
+    
+    return 0 ;
+  }
+  
+  /*backward recursion for \chi>1.008*/
+  M = 80 ;
+
+  Qn = 1.0 ; Qnm1 = 1.0 ;
+  Qn *= 1e-9 ; Qnm1 *= 1e-9 ; 
+  for ( n = N + M ; n >= N+1 ; n -- ) {
+    sc = Qnm1 ;
+    Qnm1 = (4.0*(n-1)*chi*Qnm1 - (2.0*n-1)*Qn)/(2.0*n-3) ;
+    Qn = sc ;
+  }
+  Q[N*str] = 1.0 ; Q[(N-1)*str] = Qnm1/Qn ;
+  /* G[ N   *str] *= 1e-6 ; G[(N-1)*str] *= 1e-6 ; */
+  for ( n = N ; n >= 2 ; n -- ) {
+    Q[(n-2)*str] = (4.0*(n-1)*chi*Q[(n-1)*str] - (2.0*n-1)*Q[n*str])/(2.0*n-3) ;
+  }
+  
+  mu = SQRT(2.0/(1.0+chi)) ;
+  AFMM_FUNCTION_NAME(afmm_elliptic_KE)(mu, &K, &E) ;
+  sc = mu*K/Q[0] ;
+  for ( n = 0 ; n <= N ; n ++ ) {
+    Q[n*str] *= sc ;
+  }
+
+  sc = chi*mu*K - (1.0+chi)*mu*E ;
+  if ( ABS(sc - Q[1*str]) > 1e-9 ) {
+    g_error("%s: recursion failure on Q_1=%lg, should be %lg, "
+	    "difference = %lg",
+	    __FUNCTION__, sc, Q[1*str], ABS(sc-Q[1*str])) ;
+  }
+  
+  return 0 ;
+}

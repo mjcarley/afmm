@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for order in 6 8 10 12 14 16 ; do
+    for depth in 4 5 6 7 ; do
+	./tbdown ${depth} ${order} breakdown-${depth}-${order}.dat
+	mv breakdown-${depth}-${order}.dat Data
+    done
+done
